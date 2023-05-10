@@ -1,0 +1,7 @@
+{
+  "package": "TLS-Leveling",
+  "version": "0.0.1",
+  "author": "Albonation",
+  "title": "A set of tools to automate the leveling in The Last Sunrise.",
+  "outputFile": true
+}

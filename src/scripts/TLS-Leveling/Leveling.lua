@@ -57,7 +57,7 @@ Leveling.areas = {
             "north", "west", "south", "south", "south", "west", "north", "north", "north",
             "south", "east", "north", "north", "north", "north", "west", "west", "west",
             "west", "west", "west", "west", "west", "north", "north", "north", "west",
-            "north", "east", "east", "south", "west", "south", "south", "south", "east",
+            "north", "south", "east", "east", "north", "south", "west", "south", "south", "south", "east",
             "east", "south", "south", "south", "south", "south", "south", "south", "south",
             "west", "west", "west", "west", "west", "north", "north", "north", "north",
             "north", "south", "south", "south", "south", "south", "south", "south", "south",
@@ -98,6 +98,10 @@ Leveling.areas = {
                 name = "drone",
                 description = "An alien drone races across the ceiling.",
             },
+            {
+                name = "marine",
+                description = "This marine opens fire on anything that moves!",
+            }
         },
         ["description"] = "Start at the hole in the wall, where you go just 1 down for drones.",
     }

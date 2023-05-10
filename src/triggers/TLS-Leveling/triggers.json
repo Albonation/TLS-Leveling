@@ -25,7 +25,7 @@
         "name": "Room Capture Things",
         "patterns": [
           {
-            "pattern": "^\\([A-Z]\\) \\(even match\\) (.+)$",
+            "pattern": "\\((even match|uber|challenging|trivial)\\) (.+)$",
             "type": "regex"
           }
         ]

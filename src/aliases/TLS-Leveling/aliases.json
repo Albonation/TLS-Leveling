@@ -1,6 +1,12 @@
 [
   {
-    "name": "TLS-Leveling",
-    "regex": "^TLS-Leveling$"
+    "name": "Leveling",
+    "isFolder": "yes",
+    "children": [  
+      {
+        "name": "Leveling_Alias",
+        "regex": "^leveling(?: ([a-zA-Z]+))?(?: ([a-zA-Z'|]+))?$"
+      }
+    ]
   }
 ]

@@ -1,6 +1,6 @@
 [
   {
-    "name": "TLS-Leveling_example_script",
+    "name": "Leveling",
     "eventHandlerList": [
       "sysInstall"
     ]

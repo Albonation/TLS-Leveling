@@ -1,67 +1,140 @@
 [
   {
-    "name": "Rats",
+    "name": "Leveling",
     "isFolder": "yes",
     "children": [
       {
-        "name": "Rat in",
+        "name": "killed_monster",
         "patterns": [
           {
-            "pattern": "^With a squeak, an? .*rat darts into the room, looking about wildly.$",
-            "type": "regex"
-          },
-          {
-            "pattern": "^Your eyes are drawn to an? .*rat that darts suddenly into view.$",
-            "type": "regex"
-          },
-          {
-            "pattern": "^An? .*rat wanders into view, nosing about for food.$",
-            "type": "regex"
-          },
-          {
-            "pattern": "^An? .*rat noses its way cautiously out of the shadows.$",
-            "type": "regex"
-          }
-        ],
-        "script": "echo('rat entered!')"
-      },
-      {
-        "name": "Rat out",
-        "patterns": [
-          {
-            "pattern": "^An? .*rat darts into the shadows and disappears.$",
-            "type": "regex"
-          },
-          {
-            "pattern": "^An? .*rat wanders back into its warren where you may not follow.$",
-            "type": "regex"
-          },
-          {
-            "pattern": "^With a flick of its small whiskers, an? .*rat dashes out of view.$",
+            "pattern": "^>?You receive ([0-9]*) experience points.$",
             "type": "regex"
           }
         ]
-      }
-    ]
-  },
-  {
-    "name": "Equilibrium",
-    "highlight": "yes",
-    "highlightFG": "#00aa7f",
-    "highlightBG": "#aa00ff",
-    "patterns":[
+      },
       {
-        "pattern": "Regained Equilibrium",
-        "type": "substring"
-      }
-    ]
-  },
-  {
-    "name": "Everything green",
-    "patterns": [
+        "name": "Start_Capture_Room",
+        "patterns": [
+          {
+            "pattern": "^[[]Exits: .+[]]$",
+            "type": "regex"
+          }
+        ]
+      },
       {
-        "pattern": "2,0",
-        "type": "color"
+        "name": "End_Capture_Room",
+        "patterns": [
+          {
+            "pattern": "^<(\\d+)/(\\d+) hp (\\d+)/(\\d+) end>",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Room_Capture_Things",
+        "patterns": [
+          {
+            "pattern": "^\\([A-Z]\\) \\(even match\\) (.+)$",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Flee",
+        "patterns": [
+          {
+            "pattern": "^You flee from combat!",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Fury",
+        "patterns": [
+          {
+            "pattern": "^You try to get furious but you know...life's not that bad. Not really.",
+            "type": "regex"
+          },
+          {
+            "pattern": "^The fury within you wears off.",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Haste",
+        "patterns": [
+          {
+            "pattern": "^>?You feel yourself slow down.$",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Kill_Stealing",
+        "patterns": [
+          {
+            "pattern": "^Kill stealing is not permitted.",
+            "type": "regex"
+          },
+          {
+            "pattern": "^>?They aren't here.$",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Detects",
+        "patterns": [
+          {
+            "pattern": "^You feel less aware of your surroundings.",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Sanc",
+        "patterns": [
+          {
+            "pattern": "^The white aura around your body fades.",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Move_While_Fighting",
+        "patterns": [
+          {
+            "pattern": "^>?You cannot move while fighting!$",
+            "type": "regex"
+          },
+          {
+            "pattern": "^>?No way!%s*You are still fighting!$",
+            "type": "regex"
+          },
+          {
+            "pattern": "^>?Alas,%syou cannot go that way.$",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Too_Much_Weight",
+        "patterns": [
+          {
+            "pattern": "^You are carrying too much to go anywhere.",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "Leveling_Stop_On_Death",
+        "patterns": [
+          {
+            "pattern": "^>?You are SUBDUED, and begging for mercy.$",
+            "type": "regex"
+          }
+        ]
       }
     ]
   }

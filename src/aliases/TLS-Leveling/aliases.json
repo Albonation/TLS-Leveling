@@ -1,12 +1,30 @@
 [
   {
-    "name": "Leveling",
-    "isFolder": "yes",
-    "children": [  
-      {
-        "name": "Leveling_Alias",
-        "regex": "^leveling(?: ([a-zA-Z]+))?(?: ([a-zA-Z'|]+))?$"
-      }
-    ]
+    "name": "leveling",
+    "regex": "^leveling (start|haste|fury|detects|sanc|pka|init|ignore)(?: (.+))?$"
+  },
+  {
+    "name": "leveling stop",
+    "regex": "^leveling stop$"
+  },
+  {
+    "name": "leveling help",
+    "regex": "^leveling help$"
+  },
+  {
+    "name": "leveling status",
+    "regex": "^leveling status$"
+  },
+  {
+    "name": "leveling stats",
+    "regex": "^leveling stats$"
+  },
+  {
+    "name": "levling areas",
+    "regex": "^leveling areas$"
+  },
+  {
+    "name": "leveling update",
+    "regex": "^leveling update$"
   }
 ]

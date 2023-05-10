@@ -109,72 +109,6 @@ function Leveling.printDebug(string)
     end
 end
 
-function Leveling.handleParamAction(action, param)
-    Leveling.printDebug("handleParamAction: action=" .. action .. ", param=" .. param)
-    param = string.gsub(param, "|", ";")
-
-    if action == "start" then
-        Leveling.theCurrentArea = param
-        Leveling.loadArea(param)
-    elseif action == "haste" then
-        Leveling.setHaste(param)
-    elseif action == "fury" then
-        Leveling.setFury(param)
-    elseif action == "detects" then
-        Leveling.setDetects(param)
-    elseif action == "sanc" then
-        Leveling.setSanc(param)
-    elseif action == "pka" then
-        table.insert(Leveling.postKillActions, 1, param)
-        cecho("\nAdded a new post kill action: " .. param .. "\n")
-    elseif action == "init" then
-        Leveling.setInit(param)
-    elseif action == "ignore" then
-        local match = {}
-        param = string.lower(param)
-        for k,v in pairs(Leveling.allowedMobs) do
-            if param == k then
-                match = {k}
-                break
-            elseif string.find(string.lower(v),param) then
-                table.insert(match,k)
-            end
-        end
-        for k,v in ipairs(match) do
-            if table.contains(Leveling.ignoreList,v) then
-                Leveling.ignoreList = table.n_complement(Leveling.ignoreList,v)
-                cecho("\nRemoved from ignore list: " .. Leveling.allowedMobs[v] .. "\n")
-            else
-                table.insert(Leveling.ignoreList,v)
-                cecho("\nAdded to ignore list: " .. Leveling.allowedMobs[v] .. "\n")
-            end
-        end
-    else
-        cecho("\nUnknown action: " .. action .. "\n")
-    end
-end
-
-function Leveling.handleSingleAction(action)
-    Leveling.printDebug("handleSingleParam: action=" .. action)
-
-    --if action == "update" then
-        --uninstallPackage("Leveling")
-        --installPackage("https://github.com/Albonation/TLS-Leveling/releases/latest/")
-    if action == "stop" then
-        Leveling.stop()
-    elseif action == "help" then
-        Leveling.printHelp()
-    elseif action == "status" then
-        Leveling.printStatus()
-    elseif action == "stats" then
-        Leveling.printRunStats()
-    elseif action == "areas" then
-        Leveling.printAreas()
-    else
-        cecho("\nUnknown action: " .. action .. "\n")
-    end
-end
-
 function Leveling.setHaste(string)
     Leveling.hasteAction = string
 
@@ -243,6 +177,29 @@ end
 
 function Leveling.handleSanc()
     Leveling.handleAction(Leveling.sancAction)
+end
+
+function Leveling.handleIgnoreAction(mobToIgnore)
+    local match = {}
+    mobToIgnore = string.lower(mobToIgnore)
+    for k,v in pairs(Leveling.allowedMobs) do
+        if mobToIgnore == k then
+            match = {k}
+            break
+        elseif string.find(string.lower(v),mobToIgnore) then
+            table.insert(match,k)
+        end
+    end
+
+    for k,v in ipairs(match) do
+        if table.contains(Leveling.ignoreList,v) then
+            Leveling.ignoreList = table.n_complement(Leveling.ignoreList,v)
+            cecho("\nRemoved from ignore list: " .. Leveling.allowedMobs[v] .. "\n")
+        else
+            table.insert(Leveling.ignoreList,v)
+            cecho("\nAdded to ignore list: " ..Leveling.allowedMobs[v] .. "\n")
+        end
+    end
 end
 
 function Leveling.doPostKillActions()

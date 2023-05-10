@@ -4,7 +4,7 @@
     "isFolder": "yes",
     "children": [
       {
-        "name": "killed_monster",
+        "name": "killed monster",
         "patterns": [
           {
             "pattern": "^>?You receive ([0-9]*) experience points.$",
@@ -13,7 +13,7 @@
         ]
       },
       {
-        "name": "Start_Capture_Room",
+        "name": "Start Capture Room",
         "patterns": [
           {
             "pattern": "^[[]Exits: .+[]]$",
@@ -22,7 +22,7 @@
         ]
       },
       {
-        "name": "End_Capture_Room",
+        "name": "End Capture Room",
         "patterns": [
           {
             "pattern": "^<(\\d+)/(\\d+) hp (\\d+)/(\\d+) end>",
@@ -31,7 +31,7 @@
         ]
       },
       {
-        "name": "Room_Capture_Things",
+        "name": "Room Capture Things",
         "patterns": [
           {
             "pattern": "^\\([A-Z]\\) \\(even match\\) (.+)$",
@@ -40,7 +40,7 @@
         ]
       },
       {
-        "name": "Leveling_Flee",
+        "name": "Leveling Flee",
         "patterns": [
           {
             "pattern": "^You flee from combat!",
@@ -49,7 +49,7 @@
         ]
       },
       {
-        "name": "Leveling_Fury",
+        "name": "Leveling Fury",
         "patterns": [
           {
             "pattern": "^You try to get furious but you know...life's not that bad. Not really.",
@@ -62,7 +62,7 @@
         ]
       },
       {
-        "name": "Leveling_Haste",
+        "name": "Leveling Haste",
         "patterns": [
           {
             "pattern": "^>?You feel yourself slow down.$",
@@ -71,7 +71,7 @@
         ]
       },
       {
-        "name": "Leveling_Kill_Stealing",
+        "name": "Leveling Kill Stealing",
         "patterns": [
           {
             "pattern": "^Kill stealing is not permitted.",
@@ -84,7 +84,7 @@
         ]
       },
       {
-        "name": "Leveling_Detects",
+        "name": "Leveling Detects",
         "patterns": [
           {
             "pattern": "^You feel less aware of your surroundings.",
@@ -93,7 +93,7 @@
         ]
       },
       {
-        "name": "Leveling_Sanc",
+        "name": "Leveling Sanc",
         "patterns": [
           {
             "pattern": "^The white aura around your body fades.",
@@ -102,7 +102,7 @@
         ]
       },
       {
-        "name": "Leveling_Move_While_Fighting",
+        "name": "Leveling Move While Fighting",
         "patterns": [
           {
             "pattern": "^>?You cannot move while fighting!$",
@@ -119,7 +119,7 @@
         ]
       },
       {
-        "name": "Leveling_Too_Much_Weight",
+        "name": "Leveling Too Much Weight",
         "patterns": [
           {
             "pattern": "^You are carrying too much to go anywhere.",
@@ -128,7 +128,7 @@
         ]
       },
       {
-        "name": "Leveling_Stop_On_Death",
+        "name": "Leveling Stop On Death",
         "patterns": [
           {
             "pattern": "^>?You are SUBDUED, and begging for mercy.$",

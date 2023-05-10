@@ -1,2 +1,2 @@
-enableTrigger("End Capture Room")
 enableTrigger("Room Capture Things")
+enableTrigger("End Capture Room")

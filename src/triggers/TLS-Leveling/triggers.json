@@ -22,6 +22,15 @@
         ]
       },
       {
+        "name": "Room Capture Things",
+        "patterns": [
+          {
+            "pattern": "^\\([A-Z]\\) \\(even match\\) (.+)$",
+            "type": "regex"
+          }
+        ]
+      },
+      {
         "name": "End Capture Room",
         "patterns": [
           {
@@ -31,10 +40,10 @@
         ]
       },
       {
-        "name": "Room Capture Things",
+        "name": "Still Fighting",
         "patterns": [
           {
-            "pattern": "^\\([A-Z]\\) \\(even match\\) (.+)$",
+            "pattern": "\\(even match\\)|\\(uber\\)|\\(challenging\\)|\\(trivial\\).*fighting YOU!$",
             "type": "regex"
           }
         ]

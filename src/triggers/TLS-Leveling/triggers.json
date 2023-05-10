@@ -43,7 +43,7 @@
         "name": "Still Fighting",
         "patterns": [
           {
-            "pattern": "\\(even match\\)|\\(uber\\)|\\(challenging\\)|\\(trivial\\).*fighting YOU!$",
+            "pattern": "\\((even match|uber|challenging|trivial)\\)(?=.*fighting YOU!$)",
             "type": "regex"
           }
         ]
@@ -118,11 +118,11 @@
             "type": "regex"
           },
           {
-            "pattern": "^>?No way!%s*You are still fighting!$",
+            "pattern": "^>?No way!.+You are still fighting!$",
             "type": "regex"
           },
           {
-            "pattern": "^>?Alas,%syou cannot go that way.$",
+            "pattern": "^>?Alas,.+you cannot go that way.$",
             "type": "regex"
           }
         ]

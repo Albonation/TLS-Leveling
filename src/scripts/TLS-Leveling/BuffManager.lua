@@ -1,5 +1,6 @@
 BuffManager = {}
-BuffManager.buffs = {
+BuffManager.buffs =
+{
   quickness = false,
   hide = false,
   sneak = false,
@@ -14,33 +15,32 @@ BuffManager.buffs = {
   ancient_knowledge = false
 }
 
-function BuffManager.processBuffs()
-  local anyFalse = false
+function BuffManager.checkMissingBuffs()  
+  local missingBuffs = {}  
+  for buff, value in pairs(BuffManager.buffs) do
+    if not value then
+      table.insert(missingBuffs, buff)
+    end
+  end  
+  return missingBuffs
+end
 
-  for buff, isApplied in pairs(BuffManager.buffs) do
-    if not isApplied then
+function BuffManager.processBuffs()
+  local missingBuffs = BuffManager.checkMissingBuffs()
+  if next(missingBuffs) then
+    for _, buff in ipairs(missingBuffs) do
       local castCommand = BuffManager.getCastCommand(buff)
       if castCommand then
         send(castCommand)
       end
-      
-      anyFalse = true
-      BuffManager.buffs[buff] = true -- Set the buff as applied
     end
+    send("aff")
   end
-
-  -- Send "aff" command to check if any buffs were applied
-  send("aff")
-
-  return anyFalse -- Return whether any buffs were processed
 end
 
 function BuffManager.getCastCommand(buff)
-  -- Get the cast command for the buff based on its key
-  -- Return the cast command or nil if it doesn't exist
-  -- You can define the mapping between buffs and cast commands here
-  -- Example implementation:
-  local castCommands = {
+  local castCommands =
+  {
     quickness = "quickness",
     hide = "hide",
     sneak = "sneak",
@@ -53,11 +53,6 @@ function BuffManager.getCastCommand(buff)
     rage = "rage",
     brute_strength = "brute",
     ancient_knowledge = "ancient"
-  }
-  
+  }  
   return castCommands[buff]
 end
-
-repeat
-  local anyFalse = BuffManager.processBuffs()
-until not anyFalse

@@ -1,5 +1,4 @@
 Leveling = Leveling or {}
-local BuffManager = require("BuffManager")
 
 Leveling.areas = {
     ["KoreSprings"] = {

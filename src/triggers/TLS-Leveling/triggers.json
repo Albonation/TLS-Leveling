@@ -9,7 +9,21 @@
         "patterns":
         [
           {
-            "pattern": "^Spell: '(.+)' modifies (.+) by \\d+ for \\d+ hours\\.$",
+            "pattern": "^>?Spell: '(.+)' modifies (.+) by -?\\d+ for \\d+ hours\\.$",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "gag affects",
+        "patterns":
+        [
+          {
+            "pattern": "^>?Object: Modifies (.+) by -?\\d+(.+)$",
+            "type": "regex"
+          },
+          {
+            "pattern": "^>?Spell: '(.+)' modifies (.+) by -?\\d+ for \\d+ hours\\.$",
             "type": "regex"
           }
         ]

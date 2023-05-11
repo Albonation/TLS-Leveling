@@ -12,13 +12,32 @@ Leveling.areas = {
             "w","w","w","w","w","w","w","w","w","s","s",
             "s","s","s","s","s","s","s","s","s"
         },
-        ["allowed_mobs"] = {
-            ["retainer"] = "(M) (difficult) One of the lord's retainers is here keeping an eye on the lord's lands.",
-            ["joni"] = "(Steely Aura) (M) (difficult) Joni Shagrin, once Senior Bannerman of the Guards, is here with a blood stained bandage around his temple.",
-            ["soldier"] = "(M) (difficult) A grey haired experienced soldier stands here next to a saddled horse holding a long, steel-tipped lance.",
-            ["squadman"] = "(Steely Aura) (M) (difficult) A former squadman straightens his sword belt.",
-            ["lord"] = "(Steely Aura) (M) (difficult) A bluff faced, stocky man with thick gray hair sits at a writing table.",
-            ["horse"] = "(Steely Aura) (M) (even match) A saddled horse looks prepared for a campaign.",
+        ["allowed_mobs"] =
+        {
+            {
+                name = "retainer",
+                description = "One of the lord's retainers is here keeping an eye on the lord's lands.",
+            },
+            {
+                name = "joni",
+                description = "Joni Shagrin, once Senior Bannerman of the Guards, is here with a blood stained bandage around his temple.",
+            },
+            {
+                name = "soldier",
+                description = "A grey haired experienced soldier stands here next to a saddled horse holding a long, steel-tipped lance.",
+            },
+            {
+                name = "squadman",
+                description = "A former squadman straightens his sword belt.",
+            },
+            {
+                name = "lord",
+                description = "A bluff faced, stocky man with thick gray hair sits at a writing table.",
+            },
+            {
+                name = "horse",
+                description = "A saddled horse looks prepared for a campaign.",
+            }
         },
         ["description"] = "From just south of the entrance to Kore Springs",
     },
@@ -79,7 +98,7 @@ Leveling.areas = {
                 description = "This alien drone hasn't yet reached full adulthood",
             },
             {
-                name = "drone",
+                name = "alien",
                 description = "Long, spindly legs are slowly emerging from this open egg!",
             },
             {

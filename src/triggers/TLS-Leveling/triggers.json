@@ -186,11 +186,11 @@
         "patterns":
         [
           {
-            "pattern": "A cloaked figure  is resting on the ground.$",
+            "pattern": "(Agamemnon|Someone|Suncutter)  is resting on the ground.$",
             "type": "regex"
           },
           {
-            "pattern": "A cloaked figure  is here, fighting .+$",
+            "pattern": "(Agamemnon|Someone|Suncutter)  is here, fighting .+$",
             "type": "regex"
           }
         ]

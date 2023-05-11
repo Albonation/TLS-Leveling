@@ -1,162 +1,193 @@
 [
   {
-    "name": "Leveling",
+    "name": "killed monster",
+    "patterns":
+    [
+      {
+        "pattern": "^>?You receive ([0-9]*) experience points.$",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Start Capture Room",
+    "patterns":
+    [
+      {
+        "pattern": "^[[]Exits: .+[]]$",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Room Capture Things",
+    "patterns":
+    [
+      {
+        "pattern": "\\((even match|uber|challenging|trivial)\\) (.+)$",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "End Capture Room",
+    "patterns":
+    [
+      {
+        "pattern": "^<(\\d+)/(\\d+) hp (\\d+)/(\\d+) end>",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Still Fighting",
+    "patterns":
+    [
+      {
+        "pattern": "\\((even match|uber|challenging|trivial)\\)(?=.*fighting YOU!$)",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Flee",
+    "patterns":
+    [
+      {
+        "pattern": "^You flee from combat!",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Fury",
+    "patterns":
+    [
+      {
+        "pattern": "^You try to get furious but you know...life's not that bad. Not really.",
+        "type": "regex"
+      },
+      {
+        "pattern": "^The fury within you wears off.",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Haste",
+    "patterns":
+    [
+      {
+        "pattern": "^>?You feel yourself slow down.$",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Kill Stealing",
+    "patterns":
+    [
+      {
+        "pattern": "^Kill stealing is not permitted.",
+        "type": "regex"
+      },
+      {
+        "pattern": "^>?They aren't here.$",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Detects",
+    "patterns":
+    [
+      {
+        "pattern": "^You feel less aware of your surroundings.",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Sanc",
+    "patterns":
+    [
+      {
+        "pattern": "^The white aura around your body fades.",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Move While Fighting",
+    "patterns":
+    [
+      {
+        "pattern": "^>?You cannot move while fighting!$",
+        "type": "regex"
+      },
+      {
+        "pattern": "^>?No way!.+You are still fighting!$",
+        "type": "regex"
+      },
+      {
+        "pattern": "^>?Alas,.+you cannot go that way.$",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Too Much Weight",
+    "patterns":
+    [
+      {
+        "pattern": "^You are carrying too much to go anywhere.",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Leveling Stop On Death",
+    "patterns":
+    [
+      {
+        "pattern": "^>?You are SUBDUED, and begging for mercy.$",
+        "type": "regex"
+      }
+    ]
+  },
+  {
+    "name": "Flush eyes",
     "isFolder": "yes",
-    "children": [
+    "children":
+    [
       {
-        "name": "killed monster",
-        "patterns": [
+        "name": "socked in nose",
+        "patterns":
+        [
           {
-            "pattern": "^>?You receive ([0-9]*) experience points.$",
+            "pattern": "^>?.+socks you in the nose!$",
             "type": "regex"
           }
         ]
-      },
+      }
+    ]
+  },
+  {
+    "name": "Hold for Group",
+    "isFolder": "yes",
+    "children":
+    [
       {
-        "name": "Start Capture Room",
-        "patterns": [
+        "name": "groupmate not ready",
+        "patterns":
+        [
           {
-            "pattern": "^[[]Exits: .+[]]$",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Room Capture Things",
-        "patterns": [
-          {
-            "pattern": "\\((even match|uber|challenging|trivial)\\) (.+)$",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "End Capture Room",
-        "patterns": [
-          {
-            "pattern": "^<(\\d+)/(\\d+) hp (\\d+)/(\\d+) end>",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Still Fighting",
-        "patterns": [
-          {
-            "pattern": "\\((even match|uber|challenging|trivial)\\)(?=.*fighting YOU!$)",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Flee",
-        "patterns": [
-          {
-            "pattern": "^You flee from combat!",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Fury",
-        "patterns": [
-          {
-            "pattern": "^You try to get furious but you know...life's not that bad. Not really.",
+            "pattern": "A cloaked figure  is resting on the ground.$",
             "type": "regex"
           },
           {
-            "pattern": "^The fury within you wears off.",
+            "pattern": "A cloaked figure  is here, fighting .+$",
             "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Haste",
-        "patterns": [
-          {
-            "pattern": "^>?You feel yourself slow down.$",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Kill Stealing",
-        "patterns": [
-          {
-            "pattern": "^Kill stealing is not permitted.",
-            "type": "regex"
-          },
-          {
-            "pattern": "^>?They aren't here.$",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Detects",
-        "patterns": [
-          {
-            "pattern": "^You feel less aware of your surroundings.",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Sanc",
-        "patterns": [
-          {
-            "pattern": "^The white aura around your body fades.",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Move While Fighting",
-        "patterns": [
-          {
-            "pattern": "^>?You cannot move while fighting!$",
-            "type": "regex"
-          },
-          {
-            "pattern": "^>?No way!.+You are still fighting!$",
-            "type": "regex"
-          },
-          {
-            "pattern": "^>?Alas,.+you cannot go that way.$",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Too Much Weight",
-        "patterns": [
-          {
-            "pattern": "^You are carrying too much to go anywhere.",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Leveling Stop On Death",
-        "patterns": [
-          {
-            "pattern": "^>?You are SUBDUED, and begging for mercy.$",
-            "type": "regex"
-          }
-        ]
-      },
-      {
-        "name": "Flush eyes",
-        "isFolder": "yes",
-        "children": [
-          {
-            "name": "socked in nose",
-            "patterns": [
-              {
-                "pattern": "^>?.+socks you in the nose!$",
-                "type": "regex"
-              }
-            ]
           }
         ]
       }

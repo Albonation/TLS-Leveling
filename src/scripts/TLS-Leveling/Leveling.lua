@@ -1,5 +1,5 @@
 Leveling = Leveling or {}
-local BuffManager = require("TLS-Misc.Buffmanager")
+local BuffManager = require("BuffManager")
 
 Leveling.areas = {
     ["KoreSprings"] = {

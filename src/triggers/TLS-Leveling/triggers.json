@@ -1,5 +1,201 @@
 [
   {
+    "name": "Buff Management",
+    "isFolder": "yes",
+    "children":
+    [
+      {
+        "name": "check affects",
+        "patterns":
+        [
+          {
+            "pattern": "^Spell: '(.+)' modifies (.+) by \\d+ for \\d+ hours\\.$",
+            "type": "regex"
+          }
+        ]
+      },
+      {
+        "name": "spell fell off",
+        "isFolder": "yes",
+        "children":
+        [
+          {
+            "name": "quickness",
+            "patterns":
+            [
+              {
+                "pattern": "^>?You feel your pulse slow down.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?Your pulse speeds up, but nothing happens.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "hide",
+            "patterns":
+            [
+              {
+                "pattern": "^(?:>)?You are no longer hiding.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "precision",
+            "patterns":
+            [
+              {
+                "pattern": "^>?The beating of your heart stops racing and you stop seeing clearly.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?You just can't seem to find the zone.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "sunburst",
+            "patterns":
+            [
+              {
+                "pattern": "^>?The protection of the Creator fades.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?The protection of the Great Lord of the Dark fades.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?The Creator does not grant you favor.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?The Dark One does not grant you favor.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "cloaking",
+            "patterns":
+            [
+              {
+                "pattern": "^(?:>)?The folds of your cloak drift open.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^(?:>)?You can't cover yourself completely with a cloak.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "fortitude",
+            "patterns":
+            [
+              {
+                "pattern": "^>?You feel your middle going pudgy! Oh No!!$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?You just can't seem to get into shape.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "flamevoid",
+            "patterns":
+            [
+              {
+                "pattern": "^>?The Void flickers and fades as emotions break through.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?You failed to put the Flame into the Void.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "divine grace",
+            "patterns":
+            [
+              {
+                "pattern": "^>?The Creator's grace wavers with you.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?You fail to establish a state of grace.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^?The Dark One's grace no longer shines within you.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "rage",
+            "patterns":
+            [
+              {
+                "pattern": "^>?The beating of your heart stops racing and you stop seeing red.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?You turn a little green but not enough there HULK.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "brute strength",
+            "patterns":
+            [
+              {
+                "pattern": "^>?Your muscles feel like jello.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?The creaking of your bones stop as your muscles relax.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "ancient knowledge",
+            "patterns":
+            [
+              {
+                "pattern": "^>?You feel like you forgot something maybe you should study again.$",
+                "type": "regex"
+              },
+              {
+                "pattern": "^>?You search your memory but find nothing.$",
+                "type": "regex"
+              }
+            ]
+          },
+          {
+            "name": "sneak",
+            "patterns":
+            [
+              {
+                "pattern": "^(?:>)?You no longer feel stealthy.$",
+                "type": "regex"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
     "name": "killed monster",
     "patterns":
     [

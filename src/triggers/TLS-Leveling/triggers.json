@@ -24,7 +24,7 @@
     "patterns":
     [
       {
-        "pattern": "\\((even match|uber|challenging|trivial)\\) (.+)$",
+        "pattern": "\\((even match|uber|challenging|difficult|easy|trivial)\\) (.+)$",
         "type": "regex"
       }
     ]
@@ -44,7 +44,7 @@
     "patterns":
     [
       {
-        "pattern": "\\((even match|uber|challenging|trivial)\\)(?=.*fighting YOU!$)",
+        "pattern": "\\((even match|uber|challenging|difficult|easy|trivial)\\)(?=.*fighting YOU!$)",
         "type": "regex"
       }
     ]

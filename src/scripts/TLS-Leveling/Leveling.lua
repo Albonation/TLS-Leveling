@@ -58,9 +58,20 @@ Leveling.areas = {
             "n","n","n","w","e","n","w","e","n","w","e",
             "n","w","e","n","w"
         },
-        ["allowed_mobs"] = {
-            ["troll"] = "A trolloc scout screams and attacks","A trolloc solider screams and attacks",
-            "A trolloc warrior stands here with a look of blood lust in his eyes",
+        ["allowed_mobs"] =
+        {
+            {
+                name = "troll",
+                description = "A trolloc scout screams and attacks",
+            },
+            {
+                name = "troll",
+                description = "A trolloc warrior stands here with a look of blood lust in his eyes",
+            },
+            {
+                name = "troll",
+                description = "A trolloc solider screams and attacks",
+            }
         },
         ["description"] = "Start 1 east of the trolloc camp, in the blight.",
     },

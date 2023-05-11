@@ -144,6 +144,21 @@
             "type": "regex"
           }
         ]
+      },
+      {
+        "name": "Flush eyes",
+        "isFolder": "yes",
+        "children": [
+          {
+            "name": "socked in nose",
+            "patterns": [
+              {
+                "pattern": "^>?.+socks you in the nose!$",
+                "type": "regex"
+              }
+            ]
+          }
+        ]
       }
     ]
   }

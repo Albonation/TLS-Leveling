@@ -26,5 +26,9 @@
   {
     "name": "leveling update",
     "regex": "^leveling update$"
+  },
+  {
+    "name": "leveling setprompt",
+    "regex": "^leveling setprompt$"
   }
 ]

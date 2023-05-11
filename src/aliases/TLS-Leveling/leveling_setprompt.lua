@@ -1,0 +1,1 @@
+send("prompt %c<%h-%H %a-%A %e-%E %X %x %q %g %+ %t %l %f>%c")

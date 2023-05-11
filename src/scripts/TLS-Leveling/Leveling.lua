@@ -1,4 +1,5 @@
 Leveling = Leveling or {}
+local BuffManager = require("TLS-Misc.Buffmanager")
 
 Leveling.areas = {
     ["KoreSprings"] = {
@@ -261,6 +262,9 @@ function Leveling.redoLastStep()
 end
 
 function Leveling.processStep()
+    --get any missing buffs back
+  BuffManager.processBuffs()
+      
     if #Leveling.directions > 0 then
         enableTrigger("Start Capture Room")
         Leveling.mobsInRoom = {}

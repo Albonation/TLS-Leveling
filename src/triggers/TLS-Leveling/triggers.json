@@ -34,7 +34,7 @@
     "patterns":
     [
       {
-        "pattern": "^<(\\d+)/(\\d+) hp (\\d+)/(\\d+) end>",
+        "pattern": "^<\\d+-\\d+ \\d+-\\d+ \\d+-\\d+ \\d+   \\d+ \\d+ \\d+ \\d\\d:\\d\\d (?:Ldr:|Fol:)?\\w* >",
         "type": "regex"
       }
     ]

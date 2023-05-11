@@ -161,11 +161,15 @@
     "children":
     [
       {
-        "name": "socked in nose",
+        "name": "went blind",
         "patterns":
         [
           {
             "pattern": "^>?.+socks you in the nose!$",
+            "type": "regex"
+          },
+          {
+            "pattern": "^>?.+spits in your eye!$",
             "type": "regex"
           }
         ]

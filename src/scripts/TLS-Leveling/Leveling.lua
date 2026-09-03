@@ -145,9 +145,6 @@ Leveling.areas = {
 -- directly against src/triggers/TLS-Leveling/triggers.json.
 local TRIGGERS = {
     killedMonster = "killed monster",
-    startRoomCapture = "Start Capture Room",
-    roomCaptureThings = "Room Capture Things",
-    endRoomCapture = "End Capture Room",
     flee = "Leveling Flee",
     fury = "Leveling Fury",
     haste = "Leveling Haste",
@@ -164,12 +161,6 @@ local RUN_TRIGGERS = {
     TRIGGERS.killStealing,
     TRIGGERS.moveWhileFighting,
     TRIGGERS.tooMuchWeight
-}
-
-local ROOM_CAPTURE_TRIGGERS = {
-    TRIGGERS.startRoomCapture,
-    TRIGGERS.roomCaptureThings,
-    TRIGGERS.endRoomCapture
 }
 
 local function normalizeAction(action)
@@ -267,7 +258,8 @@ function Leveling.handleIgnoreAction(mobToIgnore)
 
     local matchingNames = {}
     local namesSeen = {}
-    for _, mob in ipairs(Leveling.currentAreaMobs) do
+    local areaMobs = Leveling.currentArea and Leveling.currentArea["allowed_mobs"] or {}
+    for _, mob in ipairs(areaMobs) do
         local mobName = string.lower(tostring(mob.name or ""))
         local description = string.lower(tostring(mob.description or ""))
         if (mobName == query or string.find(description, query, 1, true)) and not namesSeen[mobName] then
@@ -335,8 +327,7 @@ function Leveling.processStep()
     BuffManager.processBuffs()
 
     if #Leveling.remainingDirections > 0 then
-        enableTrigger(TRIGGERS.startRoomCapture)
-        Leveling.currentRoomMobs = {}
+        Leveling.RoomScanner:expectScan()
 
         local direction = table.remove(Leveling.remainingDirections, 1)
         Leveling.lastDirection = direction
@@ -347,52 +338,6 @@ function Leveling.processStep()
         Leveling.stats["total"]["num_runs"] = Leveling.stats["total"]["num_runs"] + 1
         Leveling.loadArea(Leveling.currentAreaName)
     end
-end
-
---- Records a configured mob found by the room-description trigger.
---- @param description string Captured MUD room line.
-function Leveling.addRoomMob(description)
-    description = string.trim(tostring(description or ""))
-
-    for _, mob in ipairs(Leveling.currentAreaMobs) do
-        if string.trim(tostring(mob.description)) == description then
-            table.insert(Leveling.currentRoomMobs, string.lower(mob.name))
-        end
-    end
-end
-
---- Enables the two triggers that collect room contents and recognize the prompt.
-function Leveling.beginRoomScan()
-    enableTrigger(TRIGGERS.roomCaptureThings)
-    enableTrigger(TRIGGERS.endRoomCapture)
-end
-
-function Leveling.disableRoomScanTriggers()
-    for _, triggerName in ipairs(ROOM_CAPTURE_TRIGGERS) do
-        disableTrigger(triggerName)
-    end
-end
-
---- Owns cleanup of the delayed post-kill look timer. Room/combat triggers call
---- this instead of mutating a package-global timer identifier.
-function Leveling.cancelLookAfterKillTimer()
-    if Leveling.lookAfterKillTimerId then
-        killTimer(Leveling.lookAfterKillTimerId)
-        Leveling.lookAfterKillTimerId = nil
-    end
-end
-
---- Ends room capture and decides whether to attack or move on.
-function Leveling.finishRoomScan()
-    Leveling.disableRoomScanTriggers()
-    Leveling.tryKill()
-end
-
---- Stops an in-progress room scan when combat or a waiting groupmate makes its
---- captured contents unreliable.
-function Leveling.pauseRoomScan()
-    Leveling.disableRoomScanTriggers()
-    Leveling.cancelLookAfterKillTimer()
 end
 
 --- Selects an area, resets route-specific state, enables leveling triggers, and
@@ -425,12 +370,11 @@ function Leveling.loadArea(areaName)
     Leveling.isRunning = true
     Leveling.currentAreaName = areaName
     Leveling.currentArea = area
-    Leveling.currentAreaMobs = area["allowed_mobs"]
 
-    -- Navigation and room parsing state
+    -- Navigation state
     Leveling.remainingDirections = table.deepcopy(area["dirs"])
-    Leveling.currentRoomMobs = {}
     Leveling.lastDirection = ""
+    Leveling.RoomScanner:configure(area["allowed_mobs"])
 
     for _, triggerName in ipairs(RUN_TRIGGERS) do
         enableTrigger(triggerName)
@@ -452,7 +396,6 @@ end
 --- @param expForKill string|number Experience captured by the Mudlet trigger.
 function Leveling.handleKill(expForKill)
     local experience = tonumber(expForKill) or 0
-    Leveling.cancelLookAfterKillTimer()
 
     Leveling.stats["this_run"]["mobs_killed"] = Leveling.stats["this_run"]["mobs_killed"] + 1
     Leveling.stats["this_run"]["exp"] = Leveling.stats["this_run"]["exp"] + experience
@@ -460,12 +403,7 @@ function Leveling.handleKill(expForKill)
     Leveling.stats["total"]["exp"] = Leveling.stats["total"]["exp"] + experience
 
     Leveling.doPostKillActions()
-    enableTrigger(TRIGGERS.startRoomCapture)
-    Leveling.currentRoomMobs = {}
-    Leveling.lookAfterKillTimerId = tempTimer(3, [[
-        Leveling.lookAfterKillTimerId = nil
-        send("look")
-    ]])
+    Leveling.RoomScanner:requestLook(3)
 end
 
 --- Compatibility entry point retained for integrations using the old handler name.
@@ -473,17 +411,52 @@ function Leveling.checkRoom(expForKill)
     Leveling.handleKill(expForKill)
 end
 
---- Attacks the last eligible mob captured in the room, or advances the route
---- when no eligible mobs remain.
-function Leveling.tryKill()
-    if #Leveling.currentRoomMobs == 0 then
+--- Receives one completed room snapshot from RoomScanner and passes it to the
+--- existing combat decision. This is the scanner's only callback into Leveling.
+--- @param roomMobs table Attack keywords found during the completed capture.
+function Leveling.handleRoomScanComplete(roomMobs)
+    Leveling.tryKill(roomMobs)
+end
+
+-- Compatibility wrappers preserve the room handler names exposed by the first
+-- refactor while keeping all state and trigger coordination inside RoomScanner.
+function Leveling.beginRoomScan()
+    return Leveling.RoomScanner:onStart()
+end
+
+function Leveling.addRoomMob(description)
+    return Leveling.RoomScanner:onLine(description)
+end
+
+function Leveling.finishRoomScan()
+    return Leveling.RoomScanner:onFinish()
+end
+
+function Leveling.disableRoomScanTriggers()
+    return Leveling.RoomScanner:cancel()
+end
+
+function Leveling.cancelLookAfterKillTimer()
+    return Leveling.RoomScanner:cancelLookTimer()
+end
+
+function Leveling.pauseRoomScan()
+    return Leveling.RoomScanner:cancel()
+end
+
+--- Attacks the last eligible mob in a completed room snapshot, or advances the
+--- route when no eligible mobs remain. RoomScanner owns capture, not this choice.
+--- @param roomMobs table|nil Completed attack keywords from RoomScanner.
+function Leveling.tryKill(roomMobs)
+    roomMobs = roomMobs or {}
+    if #roomMobs == 0 then
         Leveling.processStep()
         return
     end
 
-    local toKill = table.remove(Leveling.currentRoomMobs)
+    local toKill = table.remove(roomMobs)
     if table.contains(Leveling.ignoredMobNames, toKill) then
-        Leveling.tryKill()
+        Leveling.tryKill(roomMobs)
         return
     end
 
@@ -510,18 +483,17 @@ function Leveling.initialize()
     Leveling.isRunning = false
     Leveling.currentAreaName = nil
     Leveling.currentArea = nil
-    Leveling.currentAreaMobs = {}
-
     -- Navigation state
     Leveling.remainingDirections = {}
     Leveling.lastDirection = ""
 
-    -- Combat and room parsing state
-    Leveling.currentRoomMobs = {}
+    -- Combat state
     Leveling.ignoredMobNames = {}
     Leveling.postKillActions = {}
 
-    -- Timer identifiers
+    -- Clear fields owned by Leveling before RoomScanner was extracted.
+    Leveling.currentAreaMobs = nil
+    Leveling.currentRoomMobs = nil
     Leveling.lookAfterKillTimerId = nil
 
     -- Statistics retained across route loops; this_run is reset by stop().
@@ -540,22 +512,19 @@ function Leveling.initialize()
     }
 
     Leveling.initialized = true
-    Leveling.stateVersion = 1
+    Leveling.stateVersion = 2
 end
 
---- Stops navigation and combat automation, cancels the owned timer, disables
---- run-specific triggers, prints the completed session, and resets run stats.
+--- Stops navigation and combat automation, resets RoomScanner, disables run
+--- triggers, prints the completed session, and resets run statistics.
 function Leveling.stop()
-    Leveling.cancelLookAfterKillTimer()
-    Leveling.disableRoomScanTriggers()
+    Leveling.RoomScanner:reset()
 
     Leveling.isRunning = false
     Leveling.currentAreaName = nil
     Leveling.currentArea = nil
-    Leveling.currentAreaMobs = {}
     Leveling.remainingDirections = {}
     Leveling.lastDirection = ""
-    Leveling.currentRoomMobs = {}
     Leveling.ignoredMobNames = {}
     Leveling.postKillActions = {}
 
@@ -671,6 +640,6 @@ function Leveling.printAreas()
     cecho("\n")
 end
 
-if not Leveling.initialized or Leveling.stateVersion ~= 1 then
+if not Leveling.initialized or Leveling.stateVersion ~= 2 then
     Leveling.initialize()
 end

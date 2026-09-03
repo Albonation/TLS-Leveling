@@ -1,1 +1,1 @@
-Leveling.finishRoomScan()
+Leveling.RoomScanner:onFinish()

@@ -6,6 +6,12 @@
     ]
   },
   {
+    "name": "RoomScanner",
+    "eventHandlerList": [
+      "sysInstall"
+    ]
+  },
+  {
     "name": "BuffManager",
     "eventHandlerList": [
       "sysInstall"

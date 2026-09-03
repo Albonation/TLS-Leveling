@@ -1,1 +1,1 @@
-Leveling.pauseRoomScan()
+Leveling.RoomScanner:cancel()

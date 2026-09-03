@@ -24,7 +24,7 @@ After installation, `leveling help` shows the available commands. Common command
 The package is written in Lua for [Mudlet](https://www.mudlet.org/) and assembled with [Muddler](https://github.com/demonnic/muddler). The root `mfile` contains package metadata. The JSON files alongside each source group define the Mudlet items included in the generated package.
 
 - `src/aliases/TLS-Leveling` contains user-command entry points and `aliases.json`.
-- `src/scripts/TLS-Leveling` contains the `Leveling` runtime, extracted `RoomScanner`, area definitions, statistics, and `BuffManager`, plus `scripts.json`.
+- `src/scripts/TLS-Leveling` contains the `Leveling` runtime, extracted `Navigator` and `RoomScanner` components, area definitions, statistics, and `BuffManager`, plus `scripts.json`.
 - `src/triggers/TLS-Leveling` contains MUD-output recognizers and `triggers.json`.
 - `.github/workflows/main.yml` runs the repository's Muddler build in CI.
 - `build/` contains generated package artifacts when a build has been run; it is not the source of truth.
@@ -35,24 +35,29 @@ The main `Leveling` table owns the active session. Its state is grouped conceptu
 
 - Configuration: debug mode and the init, haste, fury, sanctuary, and detects actions.
 - Session selection: `currentAreaName` is the configured area key; `currentArea` is the corresponding area table.
-- Navigation: `remainingDirections` and `lastDirection`.
 - Combat: ignored attack keywords and post-kill actions.
 - Statistics: the current session and totals across completed route loops.
 
-`Leveling.RoomScanner` owns the current area's mob definitions, temporary captured mobs, its delayed post-kill look timer, the three room-capture trigger names, and an explicit `idle` / `waiting-for-start` / `capturing` lifecycle. `BuffManager` separately owns known buff state and the commands used to restore missing buffs. Area definitions currently remain in `Leveling.lua`; no repository layer has been introduced yet.
+`Leveling.Navigator` is the sole owner of the copied active route, the index of the next unconfirmed step, the pending command, deferred-retry state, pause reason, and movement-attempt identity. Its explicit `idle` / `ready` / `moving` / `paused` states prevent repeated step initiation and stale movement callbacks. Navigator chooses and sends movement commands, requests the resulting scan through RoomScanner's public API, detects route completion, and hands completion back to `Leveling` for statistics and session looping. It does not select areas, restore buffs, select mobs, initiate combat, maintain ignores, or record statistics.
 
-MUD output follows this flow:
+`Leveling.RoomScanner` owns the current area's mob definitions, temporary captured mobs, its delayed post-kill look timer, the three room-capture trigger names, and an explicit `idle` / `waiting-for-start` / `capturing` lifecycle. Its optional scan-start callback lets the requester associate a room response with one exact movement attempt; RoomScanner does not manipulate navigation state. `BuffManager` separately owns known buff state and the commands used to restore missing buffs. Area definitions currently remain in `Leveling.lua`; no repository layer has been introduced yet.
+
+The primary leveling flow is:
 
 ```text
-MUD output
+Leveling session
     ↓
-Room capture triggers
+Leveling.Navigator
+    ↓
+movement command
+    ↓
+movement resolves / exits trigger
     ↓
 Leveling.RoomScanner
     ↓
 completed room contents
     ↓
-Leveling combat decision
+Leveling combat decision (future Combat component)
     ↓
 Mudlet command or next navigation step
 ```
@@ -67,7 +72,11 @@ Mudlet alias
 Leveling command/function
 ```
 
-Starting an area resolves its name to an area definition, configures RoomScanner with the unchanged `allowed_mobs` entries, copies the route into navigation state, and sends the first movement command. Navigation first asks RoomScanner to expect a scan. The exits trigger begins capture, room-line triggers submit descriptions, and the prompt trigger finalizes one completed mob list. RoomScanner returns to idle before handing that list to `Leveling.handleRoomScanComplete()`, where existing combat logic attacks an eligible mob or advances the route.
+Starting an area remains a `Leveling` session responsibility. It resolves the area definition, configures RoomScanner with the unchanged `allowed_mobs` entries, passes only `dirs` to Navigator, and requests the first step through the compatibility `Leveling.processStep()` wrapper. That wrapper retains the pre-movement BuffManager call, while Navigator owns all route mechanics.
+
+Navigator arms RoomScanner with a callback tied to the current movement-attempt number, then sends the selected route step. The exits trigger is the existing success signal: RoomScanner accepts it, Navigator advances its route index exactly once, and RoomScanner begins capture. A movement failure keeps the same index and pauses with a deferred retry; as before, no movement retry timer exists, and the next combat/room progression signal requests the retry. Cancellation removes RoomScanner's callback and increments the attempt number, so an old callback cannot advance a stopped or replaced route. Combat and group-hold triggers pause Navigator and cancel the incomplete scan without sending another movement command.
+
+The prompt trigger finalizes one completed mob list. RoomScanner returns to idle before handing that list to `Leveling.handleRoomScanComplete()`, where existing combat logic attacks an eligible mob or advances the route. After the final confirmed step has been scanned and cleared, Navigator reports completion once through `Leveling.handleRouteComplete()`. Leveling preserves the existing status output, increments the completed-run statistic, and reloads the same area. The ignore list persists across those same-area loops and resets only when a different area is selected or leveling stops.
 
 After a kill, RoomScanner owns the delayed `look` and arms the same capture lifecycle. Cancelling or stopping disables all three room triggers, cancels that timer, clears partial capture data, and returns the scanner to idle. A repeated scan request safely replaces an incomplete scan; unexpected line or end events cannot add persistent room data.
 
@@ -79,12 +88,11 @@ The key development principle is:
 
 Refactoring should remain incremental and preserve Mudlet-facing behavior. Likely future extractions, in current priority order, are:
 
-1. `Navigator`, to own route copies, last-direction retry behavior, scan requests after movement, and route completion.
-2. `Combat`, to own completed-room consumption, target selection, ignore rules, initiation, and post-kill actions.
-3. `TriggerManager`, to make non-room initial and running trigger states explicit.
-4. `Stats`, `AreaRepository`, and `Commands` as their responsibilities grow.
+1. `Combat`, to own completed-room consumption, target selection, ignore rules, initiation, and post-kill actions.
+2. `TriggerManager`, to make non-room initial and running trigger states explicit.
+3. `Stats`, `AreaRepository`, and `Commands` as their responsibilities grow.
 
-RoomScanner is now an extracted component. The remaining names describe architectural direction, not components that already exist. Prefer small tables and functions over framework or class layers.
+RoomScanner and Navigator are now extracted components. The remaining names describe architectural direction, not components that already exist. `Leveling.processStep()` and `Leveling.redoLastStep()` remain as compatibility wrappers; they do not own duplicate navigation state or logic. Prefer small tables and functions over framework or class layers.
 
 Some non-room triggers still intentionally rely on Muddler's default active state rather than the `Leveling` start/stop lifecycle. These include death, still-fighting/group-hold, buff, and utility triggers. Their intended profile-wide behavior is not yet explicit, so this pass retains it; a future trigger-lifecycle refactor should classify each one before changing when it runs.
 

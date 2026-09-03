@@ -1,1 +1,1 @@
-Leveling.RoomScanner:cancel()
+Leveling.Navigator:pause("combat")

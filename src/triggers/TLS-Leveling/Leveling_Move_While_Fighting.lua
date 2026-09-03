@@ -1,1 +1,1 @@
-Leveling.redoLastStep()
+Leveling.Navigator:onMovementFailure("movement blocked")

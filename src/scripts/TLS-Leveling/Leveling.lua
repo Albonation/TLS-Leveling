@@ -312,32 +312,24 @@ function Leveling.doPostKillActions()
     end
 end
 
---- Requeues the last movement command after Mudlet reports that movement failed.
---- The command is not sent here; the next trigger-driven step processes it.
+--- Compatibility wrapper for integrations using the previous navigation API.
 function Leveling.redoLastStep()
-    if Leveling.lastDirection ~= "" then
-        Leveling.printDebug("Going back one step.")
-        table.insert(Leveling.remainingDirections, 1, Leveling.lastDirection)
-    end
+    return Leveling.Navigator:onMovementFailure("movement blocked")
 end
 
---- Sends the next route direction and arms room capture. Completing a route
---- reloads the selected area so leveling continues without changing routes.
+--- Applies buffs before delegating all route mechanics to Navigator.
+--- This wrapper remains because combat and existing integrations advance here.
 function Leveling.processStep()
     BuffManager.processBuffs()
+    return Leveling.Navigator:processStep()
+end
 
-    if #Leveling.remainingDirections > 0 then
-        Leveling.RoomScanner:expectScan()
-
-        local direction = table.remove(Leveling.remainingDirections, 1)
-        Leveling.lastDirection = direction
-        local commands = string.split(direction, "%s*;%s*")
-        sendAll(unpack(commands))
-    else
-        cecho("\n<yellow>No steps left to process.<reset>\n")
-        Leveling.stats["total"]["num_runs"] = Leveling.stats["total"]["num_runs"] + 1
-        Leveling.loadArea(Leveling.currentAreaName)
-    end
+--- Receives Navigator's one-shot completion handoff. Statistics and selecting
+--- the next loop remain Leveling session responsibilities.
+function Leveling.handleRouteComplete()
+    cecho("\n<yellow>No steps left to process.<reset>\n")
+    Leveling.stats["total"]["num_runs"] = Leveling.stats["total"]["num_runs"] + 1
+    Leveling.loadArea(Leveling.currentAreaName)
 end
 
 --- Selects an area, resets route-specific state, enables leveling triggers, and
@@ -371,10 +363,8 @@ function Leveling.loadArea(areaName)
     Leveling.currentAreaName = areaName
     Leveling.currentArea = area
 
-    -- Navigation state
-    Leveling.remainingDirections = table.deepcopy(area["dirs"])
-    Leveling.lastDirection = ""
     Leveling.RoomScanner:configure(area["allowed_mobs"])
+    Leveling.Navigator:setRoute(area["dirs"])
 
     for _, triggerName in ipairs(RUN_TRIGGERS) do
         enableTrigger(triggerName)
@@ -483,10 +473,6 @@ function Leveling.initialize()
     Leveling.isRunning = false
     Leveling.currentAreaName = nil
     Leveling.currentArea = nil
-    -- Navigation state
-    Leveling.remainingDirections = {}
-    Leveling.lastDirection = ""
-
     -- Combat state
     Leveling.ignoredMobNames = {}
     Leveling.postKillActions = {}
@@ -495,6 +481,8 @@ function Leveling.initialize()
     Leveling.currentAreaMobs = nil
     Leveling.currentRoomMobs = nil
     Leveling.lookAfterKillTimerId = nil
+    Leveling.remainingDirections = nil
+    Leveling.lastDirection = nil
 
     -- Statistics retained across route loops; this_run is reset by stop().
     Leveling.stats = {
@@ -512,19 +500,18 @@ function Leveling.initialize()
     }
 
     Leveling.initialized = true
-    Leveling.stateVersion = 2
+    Leveling.stateVersion = 3
 end
 
 --- Stops navigation and combat automation, resets RoomScanner, disables run
 --- triggers, prints the completed session, and resets run statistics.
 function Leveling.stop()
+    Leveling.Navigator:reset()
     Leveling.RoomScanner:reset()
 
     Leveling.isRunning = false
     Leveling.currentAreaName = nil
     Leveling.currentArea = nil
-    Leveling.remainingDirections = {}
-    Leveling.lastDirection = ""
     Leveling.ignoredMobNames = {}
     Leveling.postKillActions = {}
 
@@ -640,6 +627,6 @@ function Leveling.printAreas()
     cecho("\n")
 end
 
-if not Leveling.initialized or Leveling.stateVersion ~= 2 then
+if not Leveling.initialized or Leveling.stateVersion ~= 3 then
     Leveling.initialize()
 end

@@ -12,6 +12,12 @@
     ]
   },
   {
+    "name": "Navigator",
+    "eventHandlerList": [
+      "sysInstall"
+    ]
+  },
+  {
     "name": "BuffManager",
     "eventHandlerList": [
       "sysInstall"

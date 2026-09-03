@@ -38,6 +38,7 @@ function RoomScanner:cancel()
     self:disableTriggers()
     self.state = self.states.idle
     self.capturedMobs = {}
+    self.onStartCallback = nil
 end
 
 --- Resets all scanner state, including the area-specific mob definitions.
@@ -55,8 +56,10 @@ end
 
 --- Arms the start-marker trigger for the next movement or look response.
 --- Calling this again safely discards any incomplete scan and starts fresh.
-function RoomScanner:expectScan()
+--- @param onStartCallback function|nil Optional owner callback for that response.
+function RoomScanner:expectScan(onStartCallback)
     self:cancel()
+    self.onStartCallback = onStartCallback
     self.state = self.states.waitingForStart
     enableTrigger(self.triggerNames.start)
 end
@@ -80,6 +83,13 @@ end
 --- @return boolean started Whether the scanner accepted the transition.
 function RoomScanner:onStart()
     if self.state ~= self.states.waitingForStart then
+        self:cancel()
+        return false
+    end
+
+    local onStartCallback = self.onStartCallback
+    self.onStartCallback = nil
+    if onStartCallback and onStartCallback() == false then
         self:cancel()
         return false
     end
@@ -131,6 +141,7 @@ end
 function RoomScanner:initialize()
     self.version = 1
     self.lookTimerId = nil
+    self.onStartCallback = nil
     self.mobDefinitions = {}
     self.capturedMobs = {}
     self.state = self.states.idle

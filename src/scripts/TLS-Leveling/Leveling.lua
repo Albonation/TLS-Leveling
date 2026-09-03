@@ -141,72 +141,111 @@ Leveling.areas = {
     }
 }
 
-function Leveling.printDebug(string)
+-- Mudlet trigger names are kept in one place so lifecycle calls can be checked
+-- directly against src/triggers/TLS-Leveling/triggers.json.
+local TRIGGERS = {
+    killedMonster = "killed monster",
+    startRoomCapture = "Start Capture Room",
+    roomCaptureThings = "Room Capture Things",
+    endRoomCapture = "End Capture Room",
+    flee = "Leveling Flee",
+    fury = "Leveling Fury",
+    haste = "Leveling Haste",
+    killStealing = "Leveling Kill Stealing",
+    detects = "Leveling Detects",
+    sanc = "Leveling Sanc",
+    moveWhileFighting = "Leveling Move While Fighting",
+    tooMuchWeight = "Leveling Too Much Weight"
+}
+
+local RUN_TRIGGERS = {
+    TRIGGERS.killedMonster,
+    TRIGGERS.flee,
+    TRIGGERS.killStealing,
+    TRIGGERS.moveWhileFighting,
+    TRIGGERS.tooMuchWeight
+}
+
+local ROOM_CAPTURE_TRIGGERS = {
+    TRIGGERS.startRoomCapture,
+    TRIGGERS.roomCaptureThings,
+    TRIGGERS.endRoomCapture
+}
+
+local function normalizeAction(action)
+    return string.trim(tostring(action or ""))
+end
+
+function Leveling.printDebug(message)
     if Leveling.debug == true then
-        cecho("\n<red>DEBUG: " .. string .. "<reset>\n")
+        cecho("\n<red>DEBUG: " .. message .. "<reset>\n")
     end
 end
 
-function Leveling.setHaste(string)
-    Leveling.hasteAction = string
+function Leveling.setHaste(action)
+    Leveling.hasteAction = normalizeAction(action)
 
-    if string == "" then
+    if Leveling.hasteAction == "" then
         cecho("\nHaste action disabled.\n")
-        disableTrigger("Leveling Haste")
+        disableTrigger(TRIGGERS.haste)
     else
         cecho("\nHaste action set to: " .. Leveling.hasteAction .. "\n")
-        enableTrigger("Leveling Haste")
+        enableTrigger(TRIGGERS.haste)
     end
 end
 
-function Leveling.setFury(string)
-    Leveling.fury = string
+function Leveling.setFury(action)
+    Leveling.furyAction = normalizeAction(action)
 
-    if string == "" then
+    if Leveling.furyAction == "" then
         cecho("\nFury disabled\n")
-        disableTrigger("Levleing Fury")
+        disableTrigger(TRIGGERS.fury)
     else
         cecho("\nFury enabled\n")
-        enableTrigger("Leveling Fury")
+        enableTrigger(TRIGGERS.fury)
     end
 end
 
-function Leveling.setDetects(string)
-    Leveling.detectsAction = string
+function Leveling.setDetects(action)
+    Leveling.detectsAction = normalizeAction(action)
 
-    if string == "" then
+    if Leveling.detectsAction == "" then
         cecho("\nDetects disabled.\n")
-        disableTrigger("Leveling Detects")
+        disableTrigger(TRIGGERS.detects)
     else
         cecho("\nDetects action set to: " .. Leveling.detectsAction .. "\n")
-        enableTrigger("Leveling Detects")
+        enableTrigger(TRIGGERS.detects)
     end
 end
 
-function Leveling.setSanc(string)
-    Leveling.sancAction = string
+function Leveling.setSanc(action)
+    Leveling.sancAction = normalizeAction(action)
 
-    if string == "" then
+    if Leveling.sancAction == "" then
         cecho("\nSanc action disabled.\n")
-        disableTrigger("Leveling Sanc")
+        disableTrigger(TRIGGERS.sanc)
     else
         cecho("\nSanc action set to: " .. Leveling.sancAction .. "\n")
-        enableTrigger("Leveling Sanc")
+        enableTrigger(TRIGGERS.sanc)
     end
 end
 
-function Leveling.setInit(string)
-    Leveling.initAction = string
+function Leveling.setInit(action)
+    Leveling.initAction = normalizeAction(action)
 
-    if string == "" then
+    if Leveling.initAction == "" then
         Leveling.initAction = "kill"
     else
-        cecho("\nInit action set to ".. string)
+        cecho("\nInit action set to " .. Leveling.initAction)
     end
 end
 
 function Leveling.handleHaste()
     Leveling.handleAction(Leveling.hasteAction)
+end
+
+function Leveling.handleFury()
+    send("fury")
 end
 
 function Leveling.handleDetects()
@@ -217,179 +256,275 @@ function Leveling.handleSanc()
     Leveling.handleAction(Leveling.sancAction)
 end
 
+--- Toggles every current-area mob whose name exactly matches the query or whose
+--- description contains it. The ignore list stores attack keywords, not area data.
+--- @param mobToIgnore string User-supplied mob name or description fragment.
 function Leveling.handleIgnoreAction(mobToIgnore)
-    local match = {}
-    mobToIgnore = string.lower(mobToIgnore)
-    for k,v in pairs(Leveling.allowedMobs) do
-        if mobToIgnore == k then
-            match = {k}
-            break
-        elseif string.find(string.lower(v),mobToIgnore) then
-            table.insert(match,k)
+    local query = string.lower(normalizeAction(mobToIgnore))
+    if query == "" then
+        return
+    end
+
+    local matchingNames = {}
+    local namesSeen = {}
+    for _, mob in ipairs(Leveling.currentAreaMobs) do
+        local mobName = string.lower(tostring(mob.name or ""))
+        local description = string.lower(tostring(mob.description or ""))
+        if (mobName == query or string.find(description, query, 1, true)) and not namesSeen[mobName] then
+            table.insert(matchingNames, mobName)
+            namesSeen[mobName] = true
         end
     end
 
-    for k,v in ipairs(match) do
-        if table.contains(Leveling.ignoreList,v) then
-            Leveling.ignoreList = table.n_complement(Leveling.ignoreList,v)
-            cecho("\nRemoved from ignore list: " .. Leveling.allowedMobs[v] .. "\n")
+    for _, mobName in ipairs(matchingNames) do
+        local removed = false
+        for index = #Leveling.ignoredMobNames, 1, -1 do
+            if Leveling.ignoredMobNames[index] == mobName then
+                table.remove(Leveling.ignoredMobNames, index)
+                removed = true
+            end
+        end
+
+        if removed then
+            cecho("\nRemoved from ignore list: " .. mobName .. "\n")
         else
-            table.insert(Leveling.ignoreList,v)
-            cecho("\nAdded to ignore list: " ..Leveling.allowedMobs[v] .. "\n")
+            table.insert(Leveling.ignoredMobNames, mobName)
+            cecho("\nAdded to ignore list: " .. mobName .. "\n")
         end
     end
 end
 
+--- Queues a command to run after combat. Actions are consumed in insertion order.
+--- @param action string Command or semicolon-delimited command sequence.
+--- @return boolean added Whether a non-empty action was queued.
+function Leveling.addPostKillAction(action)
+    action = normalizeAction(action)
+    if action == "" then
+        return false
+    end
+
+    table.insert(Leveling.postKillActions, 1, action)
+    cecho("\nAdded a new post kill action: " .. action .. "\n")
+    return true
+end
+
+--- Executes and clears commands deferred until the current fight ended.
 function Leveling.doPostKillActions()
     local numActions = #Leveling.postKillActions
-    Leveling.printDebug("doPostKillActions: numAction=" .. numActions)
-    
-    if numActions > 0 then
-        for ndx=1, numActions, 1 do
-            local action = table.remove(Leveling.postKillActions)
-            local actions = string.split(action,"%s*;%s*")
-            sendAll(unpack(actions))
-        end
+    Leveling.printDebug("doPostKillActions: numActions=" .. numActions)
+
+    for _ = 1, numActions do
+        local action = table.remove(Leveling.postKillActions)
+        local actions = string.split(action, "%s*;%s*")
+        sendAll(unpack(actions))
     end
 end
 
+--- Requeues the last movement command after Mudlet reports that movement failed.
+--- The command is not sent here; the next trigger-driven step processes it.
 function Leveling.redoLastStep()
-    if Leveling.lastStep ~= "" then
+    if Leveling.lastDirection ~= "" then
         Leveling.printDebug("Going back one step.")
-        table.insert(Leveling.directions, 1, Leveling.lastStep)
+        table.insert(Leveling.remainingDirections, 1, Leveling.lastDirection)
     end
 end
 
+--- Sends the next route direction and arms room capture. Completing a route
+--- reloads the selected area so leveling continues without changing routes.
 function Leveling.processStep()
-    --get any missing buffs back
-  BuffManager.processBuffs()
-      
-    if #Leveling.directions > 0 then
-        enableTrigger("Start Capture Room")
-        Leveling.mobsInRoom = {}
-        --Leveling.mobsToCheck = 0
+    BuffManager.processBuffs()
 
-        local dir = table.remove(Leveling.directions,1)
-        Leveling.lastStep = dir
-        local dirs = string.split(dir,"%s*;%s*")
-        sendAll(unpack(dirs))
+    if #Leveling.remainingDirections > 0 then
+        enableTrigger(TRIGGERS.startRoomCapture)
+        Leveling.currentRoomMobs = {}
+
+        local direction = table.remove(Leveling.remainingDirections, 1)
+        Leveling.lastDirection = direction
+        local commands = string.split(direction, "%s*;%s*")
+        sendAll(unpack(commands))
     else
         cecho("\n<yellow>No steps left to process.<reset>\n")
         Leveling.stats["total"]["num_runs"] = Leveling.stats["total"]["num_runs"] + 1
-        Leveling.loadArea(Leveling.theCurrentArea)
+        Leveling.loadArea(Leveling.currentAreaName)
     end
 end
 
-function Leveling.addRoomMob(str)
-    str = string.trim(str)
+--- Records a configured mob found by the room-description trigger.
+--- @param description string Captured MUD room line.
+function Leveling.addRoomMob(description)
+    description = string.trim(tostring(description or ""))
 
-    for index,mob in ipairs(Leveling.allowedMobs) do
-        mob.description = tostring(mob.description)
-        if string.trim(mob.description) == str then
-            --Leveling.mobsToCheck = Leveling.mobsToCheck + 1
-            table.insert(Leveling.mobsInRoom, mob.name)
+    for _, mob in ipairs(Leveling.currentAreaMobs) do
+        if string.trim(tostring(mob.description)) == description then
+            table.insert(Leveling.currentRoomMobs, string.lower(mob.name))
         end
     end
 end
 
+--- Enables the two triggers that collect room contents and recognize the prompt.
+function Leveling.beginRoomScan()
+    enableTrigger(TRIGGERS.roomCaptureThings)
+    enableTrigger(TRIGGERS.endRoomCapture)
+end
+
+function Leveling.disableRoomScanTriggers()
+    for _, triggerName in ipairs(ROOM_CAPTURE_TRIGGERS) do
+        disableTrigger(triggerName)
+    end
+end
+
+--- Owns cleanup of the delayed post-kill look timer. Room/combat triggers call
+--- this instead of mutating a package-global timer identifier.
+function Leveling.cancelLookAfterKillTimer()
+    if Leveling.lookAfterKillTimerId then
+        killTimer(Leveling.lookAfterKillTimerId)
+        Leveling.lookAfterKillTimerId = nil
+    end
+end
+
+--- Ends room capture and decides whether to attack or move on.
+function Leveling.finishRoomScan()
+    Leveling.disableRoomScanTriggers()
+    Leveling.tryKill()
+end
+
+--- Stops an in-progress room scan when combat or a waiting groupmate makes its
+--- captured contents unreliable.
+function Leveling.pauseRoomScan()
+    Leveling.disableRoomScanTriggers()
+    Leveling.cancelLookAfterKillTimer()
+end
+
+--- Selects an area, resets route-specific state, enables leveling triggers, and
+--- sends the first movement command. Configuration actions persist across runs.
+--- @param areaName string Key in Leveling.areas, or "stop" for compatibility.
 function Leveling.loadArea(areaName)
+    areaName = normalizeAction(areaName)
     if areaName == "stop" then
         cecho("\n<red>Leveling script STOPPED.<reset>\n")
         Leveling.stop()
-    else
-        cecho("<red>\nAttempting to load: '" .. areaName .. "'<reset>\n")
-
-        if Leveling.areas[areaName] then
-            if Leveling.stats["total"]["time"] == 0 then
-                Leveling.stats["total"]["time"] = os.time()
-            end
-
-            Leveling.directions = {}
-            Leveling.mobsInRoom = {}
-            --Leveling.mobsToCheck = 0
-            if Leveling.currentArea ~= areaName then
-                Leveling.ignoreList = {}
-            end
-            Leveling.started = true
-            local area = Leveling.areas[areaName]
-            Leveling.currentArea = area
-            Leveling.allowedMobs = area["allowed_mobs"]
-            -- force all mob name keywords to lower case
-            for k,v in pairs(Leveling.allowedMobs) do
-                if not string.lower(k) == k then
-                    Leveling.allowedMobs[string.lower(k)] = v
-                    Leveling.allowedMobs[k] = nil
-                end
-            end
-            Leveling.directions = table.deepcopy(area["dirs"])
-            enableTrigger("kill monster")
-            enableTrigger("Leveling Flee")
-            enableTrigger("Leveling Move While Fighting")
-            enableTrigger("Leveling Too Much Weight")
-            enableTrigger("Leveling Kill Stealing")
-            -- use the helper functions to re-enable the triggers if we should
-            Leveling.setFury(Leveling.fury)
-            Leveling.setHaste(Leveling.hasteAction)
-            Leveling.setSanc(Leveling.sancAction)
-            Leveling.setDetects(Leveling.detectsAction)
-            cecho("<purple>Area loaded. Let's do this!<reset>\n")
-            Leveling.stats["this_run"]["time"] = os.time()
-            Leveling.processStep()
-        else
-            cecho("\n<red>Unknown area: " .. areaName .. ".<reset>\n")
-        end
+        return
     end
+
+    cecho("<red>\nAttempting to load: '" .. areaName .. "'<reset>\n")
+    local area = Leveling.areas[areaName]
+    if not area then
+        cecho("\n<red>Unknown area: " .. areaName .. ".<reset>\n")
+        return
+    end
+
+    if Leveling.stats["total"]["time"] == 0 then
+        Leveling.stats["total"]["time"] = os.time()
+    end
+
+    if Leveling.currentAreaName ~= areaName then
+        Leveling.ignoredMobNames = {}
+    end
+
+    -- Current leveling session
+    Leveling.isRunning = true
+    Leveling.currentAreaName = areaName
+    Leveling.currentArea = area
+    Leveling.currentAreaMobs = area["allowed_mobs"]
+
+    -- Navigation and room parsing state
+    Leveling.remainingDirections = table.deepcopy(area["dirs"])
+    Leveling.currentRoomMobs = {}
+    Leveling.lastDirection = ""
+
+    for _, triggerName in ipairs(RUN_TRIGGERS) do
+        enableTrigger(triggerName)
+    end
+
+    -- Reapply configurable trigger state after stop() disabled it.
+    Leveling.setFury(Leveling.furyAction)
+    Leveling.setHaste(Leveling.hasteAction)
+    Leveling.setSanc(Leveling.sancAction)
+    Leveling.setDetects(Leveling.detectsAction)
+
+    cecho("<purple>Area loaded. Let's do this!<reset>\n")
+    Leveling.stats["this_run"]["time"] = os.time()
+    Leveling.processStep()
 end
 
-function Leveling.checkRoom(expForKill)
-    -- updating stats
+--- Handles the experience line emitted after a kill: updates statistics, runs
+--- deferred actions, resets room parsing, and schedules a fresh look command.
+--- @param expForKill string|number Experience captured by the Mudlet trigger.
+function Leveling.handleKill(expForKill)
+    local experience = tonumber(expForKill) or 0
+    Leveling.cancelLookAfterKillTimer()
+
     Leveling.stats["this_run"]["mobs_killed"] = Leveling.stats["this_run"]["mobs_killed"] + 1
-    Leveling.stats["this_run"]["exp"] = Leveling.stats["this_run"]["exp"] + expForKill
+    Leveling.stats["this_run"]["exp"] = Leveling.stats["this_run"]["exp"] + experience
     Leveling.stats["total"]["mobs_killed"] = Leveling.stats["total"]["mobs_killed"] + 1
-    Leveling.stats["total"]["exp"] = Leveling.stats["total"]["exp"] + expForKill
-    -- Before we kill things, see if we need to do any post combat actions
+    Leveling.stats["total"]["exp"] = Leveling.stats["total"]["exp"] + experience
+
     Leveling.doPostKillActions()
-
-    enableTrigger("Start Capture Room")
-    Leveling.mobsInRoom = {}
-    --Leveling.mobsToCheck = 0
-
-    lookAfterKill = tempTimer(3, [[ send("look") ]])
+    enableTrigger(TRIGGERS.startRoomCapture)
+    Leveling.currentRoomMobs = {}
+    Leveling.lookAfterKillTimerId = tempTimer(3, [[
+        Leveling.lookAfterKillTimerId = nil
+        send("look")
+    ]])
 end
 
+--- Compatibility entry point retained for integrations using the old handler name.
+function Leveling.checkRoom(expForKill)
+    Leveling.handleKill(expForKill)
+end
+
+--- Attacks the last eligible mob captured in the room, or advances the route
+--- when no eligible mobs remain.
 function Leveling.tryKill()
-    if #Leveling.mobsInRoom == 0 then
+    if #Leveling.currentRoomMobs == 0 then
         Leveling.processStep()
-    else
-        local toKill = table.remove(Leveling.mobsInRoom)
-        if not table.contains(Leveling.ignoreList, toKill) then
-            cecho("<yellow>\nFound a match, kill it good.\n<reset>")
-            local actions = string.split(Leveling.initAction,"%s*;%s*")
-            for k,v in ipairs(actions) do
-                actions[k] = v .. " " .. toKill
-            end
-            sendAll(unpack(actions))
-        else
-            Leveling.tryKill()
-        end
+        return
     end
+
+    local toKill = table.remove(Leveling.currentRoomMobs)
+    if table.contains(Leveling.ignoredMobNames, toKill) then
+        Leveling.tryKill()
+        return
+    end
+
+    cecho("<yellow>\nFound a match, kill it good.\n<reset>")
+    local actions = string.split(Leveling.initAction, "%s*;%s*")
+    for index, action in ipairs(actions) do
+        actions[index] = action .. " " .. toKill
+    end
+    sendAll(unpack(actions))
 end
 
+--- Establishes all Leveling-owned state. This is also the one-time migration
+--- path from the pre-refactor state layout when an installed package is updated.
 function Leveling.initialize()
-    Leveling.initialized = true
-    Leveling.allowedMobs = {}
-    --Leveling.mobsToCheck = 0
-    Leveling.started = false
-    Leveling.postKillActions = {}
-    Leveling.directions = {}
+    -- Configuration
+    Leveling.debug = false
     Leveling.initAction = "kill"
     Leveling.hasteAction = ""
+    Leveling.furyAction = ""
     Leveling.sancAction = ""
     Leveling.detectsAction = ""
-    Leveling.berserk = ""
-    Leveling.fury = ""
-    Leveling.detectsAction = ""
-    Leveling.previousStep = ""
+
+    -- Current leveling session
+    Leveling.isRunning = false
+    Leveling.currentAreaName = nil
+    Leveling.currentArea = nil
+    Leveling.currentAreaMobs = {}
+
+    -- Navigation state
+    Leveling.remainingDirections = {}
+    Leveling.lastDirection = ""
+
+    -- Combat and room parsing state
+    Leveling.currentRoomMobs = {}
+    Leveling.ignoredMobNames = {}
+    Leveling.postKillActions = {}
+
+    -- Timer identifiers
+    Leveling.lookAfterKillTimerId = nil
+
+    -- Statistics retained across route loops; this_run is reset by stop().
     Leveling.stats = {
         ["total"] = {
             ["mobs_killed"] = 0,
@@ -403,30 +538,35 @@ function Leveling.initialize()
             ["time"] = 0
         }
     }
-    Leveling.debug = false
+
+    Leveling.initialized = true
+    Leveling.stateVersion = 1
 end
 
+--- Stops navigation and combat automation, cancels the owned timer, disables
+--- run-specific triggers, prints the completed session, and resets run stats.
 function Leveling.stop()
-    Leveling.directions = {}
-    Leveling.mobsInRoom = {}
+    Leveling.cancelLookAfterKillTimer()
+    Leveling.disableRoomScanTriggers()
+
+    Leveling.isRunning = false
+    Leveling.currentAreaName = nil
+    Leveling.currentArea = nil
+    Leveling.currentAreaMobs = {}
+    Leveling.remainingDirections = {}
+    Leveling.lastDirection = ""
+    Leveling.currentRoomMobs = {}
+    Leveling.ignoredMobNames = {}
     Leveling.postKillActions = {}
-    --Leveling.mobsToCheck = 0
-    Leveling.started = false
-    Leveling.allowedMobs = {}
-    Leveling.previousStep = ""
-    Leveling.theCurrentArea = ""
-    disableTrigger("kill monster")
-    disableTrigger("Start Capture Room")
-    disableTrigger("End Capture Room")
-    disableTrigger("Room Capture Things")
-    disableTrigger("Leveling Flee")
-    disableTrigger("Leveling Kill Stealing")
-    disableTrigger("Leveling Haste")
-    disableTrigger("Leveling Fury")
-    disableTrigger("Leveling Detects")
-    disableTrigger("Leveling Sanc")
-    disableTrigger("Leveling Move While Fighting")
-    disableTrigger("Leveling Too Much Weight")
+
+    for _, triggerName in ipairs(RUN_TRIGGERS) do
+        disableTrigger(triggerName)
+    end
+    disableTrigger(TRIGGERS.haste)
+    disableTrigger(TRIGGERS.fury)
+    disableTrigger(TRIGGERS.detects)
+    disableTrigger(TRIGGERS.sanc)
+
     Leveling.printRunStats()
     Leveling.resetRunStats()
     echo("\nLeveling STOPPED\n")
@@ -440,46 +580,67 @@ function Leveling.resetRunStats()
     }
 end
 
+--- Runs an action immediately, except cast commands (those beginning with "c"),
+--- which are deferred until combat ends to avoid interfering with a fight.
 function Leveling.handleAction(action)
+    action = normalizeAction(action)
     Leveling.printDebug("handleAction: " .. action)
-    if action ~= "" then
-        if string.starts(action, "c") then
-            Leveling.printDebug("adding post kill action: " .. action)
-            table.insert(Leveling.postKillActions, 1, action)
-        else
-            local actions = string.split(action,"%s*;%s*")
-            sendAll(unpack(actions))
-        end
+    if action == "" then
+        return
+    end
+
+    if string.starts(action, "c") then
+        Leveling.printDebug("adding post kill action: " .. action)
+        table.insert(Leveling.postKillActions, 1, action)
+    else
+        local actions = string.split(action, "%s*;%s*")
+        sendAll(unpack(actions))
     end
 end
 
-function Leveling.printRunStats()
-    local expThisRun = Leveling.stats["this_run"]["exp"]
-    local avg = expThisRun / Leveling.stats["this_run"]["mobs_killed"]
-    local currentTime = os.time()
-    local minutesSinceStart = math.floor((currentTime - Leveling.stats["this_run"]["time"]) / 60)
-    local expPerMinute = expThisRun / minutesSinceStart
+local function safeAverage(total, count)
+    if count == 0 then
+        return 0
+    end
+    return total / count
+end
 
-    local totalExp = Leveling.stats["total"]["exp"]
-    local totalAvg = totalExp / Leveling.stats["total"]["mobs_killed"]
-    local minutesSinceTotalStart = math.floor((currentTime - Leveling.stats["total"]["time"]) / 60)
-    local totalExpPerMinute = totalExp / minutesSinceTotalStart
-    
-    local format = function (val) return string.gsub(math.floor(val), "^(-?%d+)(%d%d%d)", '%1,%2') end
-    
+local function safePerMinute(total, startedAt, currentTime)
+    if startedAt == 0 then
+        return 0
+    end
+
+    local elapsedMinutes = math.floor((currentTime - startedAt) / 60)
+    return total / math.max(elapsedMinutes, 1)
+end
+
+local function formatNumber(value)
+    local formatted = tostring(math.floor(value))
+    formatted = string.gsub(formatted, "^(-?%d+)(%d%d%d)", "%1,%2")
+    return formatted
+end
+
+function Leveling.printRunStats()
+    local currentTime = os.time()
+    local thisRun = Leveling.stats["this_run"]
+    local total = Leveling.stats["total"]
+    local runAverage = safeAverage(thisRun["exp"], thisRun["mobs_killed"])
+    local totalAverage = safeAverage(total["exp"], total["mobs_killed"])
+    local runExpPerMinute = safePerMinute(thisRun["exp"], thisRun["time"], currentTime)
+    local totalExpPerMinute = safePerMinute(total["exp"], total["time"], currentTime)
+
     cecho("\n<yellow>              Leveling Stats<reset>\n\n")
-    cecho("                Current Run | All Runs (" .. Leveling.stats["total"]["num_runs"] .. ")\n")
-    cecho(string.format(" Mobs Killed:   <red>%12s<reset>| <red>%12s<reset>\n", Leveling.stats["this_run"]["mobs_killed"], Leveling.stats["total"]["mobs_killed"]))
-    cecho(string.format(" Total Exp:     <yellow>%12s<reset>| <yellow>%12s<reset>\n", format(expThisRun), format(totalExp)))
+    cecho("                Current Run | All Runs (" .. total["num_runs"] .. ")\n")
+    cecho(string.format(" Mobs Killed:   <red>%12s<reset>| <red>%12s<reset>\n", thisRun["mobs_killed"], total["mobs_killed"]))
+    cecho(string.format(" Total Exp:     <yellow>%12s<reset>| <yellow>%12s<reset>\n", formatNumber(thisRun["exp"]), formatNumber(total["exp"])))
     cecho(" -----------------------------------------\n")
-    cecho(string.format(" Avg Per Kill:  <yellow>%12s<reset>| <yellow>%12s<reset>\n", format(avg), format(totalAvg)))
-    cecho(string.format(" Exp Per Hour:  <yellow>%12s<reset>| <yellow>%12s<reset>\n\n", format(expPerMinute * 60), format(totalExpPerMinute * 60)))
+    cecho(string.format(" Avg Per Kill:  <yellow>%12s<reset>| <yellow>%12s<reset>\n", formatNumber(runAverage), formatNumber(totalAverage)))
+    cecho(string.format(" Exp Per Hour:  <yellow>%12s<reset>| <yellow>%12s<reset>\n\n", formatNumber(runExpPerMinute * 60), formatNumber(totalExpPerMinute * 60)))
 end
 
 function Leveling.printHelp()
     cecho("\n         <red>Leveling Script<reset>\n\n")
     cecho(" <yellow>Usage:<reset>\n")
-   --cecho("   Update script:          'leveling update'\n")
     cecho("   Start area:             'leveling start [area name]'\n")
     cecho("   Stop script:            'leveling stop'\n")
     cecho("   Stats:                  'leveling stats'\n")
@@ -503,13 +664,13 @@ end
 function Leveling.printAreas()
     cecho("\n<red>        Leveling Areas:<reset>\n\n")
 
-    for ndx,val in pairs(Leveling.areas) do
-        cecho("  * <yellow>" .. ndx .. "<reset>\n")
-        cecho("      " .. Leveling.areas[ndx]["description"] .. "\n")
+    for areaName in pairs(Leveling.areas) do
+        cecho("  * <yellow>" .. areaName .. "<reset>\n")
+        cecho("      " .. Leveling.areas[areaName]["description"] .. "\n")
     end
     cecho("\n")
 end
 
-if not Leveling.initialized then
+if not Leveling.initialized or Leveling.stateVersion ~= 1 then
     Leveling.initialize()
 end

@@ -1,1 +1,1 @@
-send("fury")
+Leveling.handleFury()

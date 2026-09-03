@@ -9,7 +9,6 @@ if not table.contains(valid_options, option) then
 end
 
 if option == "start" then
-    Leveling.theCurrentArea = value
     Leveling.loadArea(value)
 
 elseif option == "haste" then
@@ -25,8 +24,7 @@ elseif option == "sanc" then
     Leveling.setSanc(value)
 
 elseif option == "pka" then
-    table.insert(Leveling.postKillActions, 1, value)
-    cecho("\nAdded a new post kill action: " .. value .. "\n")
+    Leveling.addPostKillAction(value)
 
 elseif option == "init" then
     Leveling.setInit(value)

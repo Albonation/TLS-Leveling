@@ -1,5 +1,1 @@
-if lookAfterKill then
-    killTimer(lookAfterKill)
-    lookAfterKill = nil
-end
-Leveling.checkRoom(matches[2])
+Leveling.handleKill(matches[2])

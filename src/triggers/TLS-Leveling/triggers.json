@@ -148,7 +148,7 @@
                 "type": "regex"
               },
               {
-                "pattern": "^?The Dark One's grace no longer shines within you.$",
+                "pattern": "^>?The Dark One's grace no longer shines within you.$",
                 "type": "regex"
               }
             ]

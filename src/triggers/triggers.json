@@ -221,6 +221,7 @@
   },
   {
     "name": "Start Capture Room",
+    "isActive": false,
     "patterns":
     [
       {
@@ -231,6 +232,7 @@
   },
   {
     "name": "Room Capture Things",
+    "isActive": false,
     "patterns":
     [
       {
@@ -241,11 +243,12 @@
   },
   {
     "name": "End Capture Room",
+    "isActive": false,
     "patterns":
     [
       {
-        "pattern": "^<\\d+-\\d+ \\d+-\\d+ \\d+-\\d+ \\d+   \\d+ \\d+ \\d+ \\d\\d:\\d\\d (?:Ldr:|Fol:)?\\w* >",
-        "type": "regex"
+        "pattern": "[TLSLVL]",
+        "type": "substring"
       }
     ]
   },

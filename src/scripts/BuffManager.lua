@@ -45,13 +45,13 @@ end
 
 --- Returns the internal names of every buff not currently confirmed active.
 --- @return table missingBuffs
-function BuffManager.checkMissingBuffs()  
-  local missingBuffs = {}  
+function BuffManager.checkMissingBuffs()
+  local missingBuffs = {}
   for buff, value in pairs(BuffManager.buffs) do
     if not value then
       table.insert(missingBuffs, buff)
     end
-  end  
+  end
   return missingBuffs
 end
 
@@ -88,6 +88,6 @@ function BuffManager.getCastCommand(buff)
     rage = "rage",
     brute_strength = "brute",
     ancient_knowledge = "ancient"
-  }  
+  }
   return castCommands[buff]
 end

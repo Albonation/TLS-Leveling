@@ -2,6 +2,11 @@ local valid_options = {"start", "haste", "fury", "detects", "sanc", "pka", "init
 local valid_options_string = table.concat(valid_options, ", ")
 local option = matches[2]
 local value = matches[3]
+if not option or option == "" then
+    Leveling.printHelp()
+    return
+end
+
 if not table.contains(valid_options, option) then
     cecho("I'm sorry but the available options are: " .. valid_options_string)
     Leveling.printHelp()

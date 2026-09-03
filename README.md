@@ -12,20 +12,30 @@ installPackage("https://github.com/Albonation/TLS-Leveling/releases/latest/downl
 
 After installation, `leveling help` shows the available commands. Common commands include:
 
+- `leveling` — show package help.
 - `leveling start <area>` — start the selected route.
 - `leveling stop` — stop navigation and combat automation.
+- `leveling setprompt` — configure the recommended TLS-Leveling prompt.
 - `leveling areas` — list configured areas.
 - `leveling status` — show configured combat and buff actions.
 - `leveling stats` — show current-session and total statistics.
 - `leveling update` — install the latest released package.
 
+Before starting a route, run:
+
+```text
+leveling setprompt
+```
+
+This sends `prompt <%h/%H hp %e/%E end> [TLSLVL]`. TLS-Leveling requires the literal `[TLSLVL]` marker somewhere in the player's MUD prompt so RoomScanner can recognize the end of command output. You may use any other prompt format as long as that marker remains present; TLS adds its own stance and status flags separately.
+
 ## Tooling and source layout
 
 The package is written in Lua for [Mudlet](https://www.mudlet.org/) and assembled with [Muddler](https://github.com/demonnic/muddler). The root `mfile` contains package metadata. The JSON files alongside each source group define the Mudlet items included in the generated package.
 
-- `src/aliases/TLS-Leveling` contains user-command entry points and `aliases.json`.
-- `src/scripts/TLS-Leveling` contains the `Leveling` runtime, extracted `Navigator` and `RoomScanner` components, area definitions, statistics, and `BuffManager`, plus `scripts.json`.
-- `src/triggers/TLS-Leveling` contains MUD-output recognizers and `triggers.json`.
+- `src/aliases` contains user-command entry points and `aliases.json`.
+- `src/scripts` contains the `Leveling` runtime, extracted `Navigator` and `RoomScanner` components, area definitions, statistics, and `BuffManager`, plus `scripts.json`.
+- `src/triggers` contains MUD-output recognizers and `triggers.json`.
 - `.github/workflows/main.yml` runs the repository's Muddler build in CI.
 - `build/` contains generated package artifacts when a build has been run; it is not the source of truth.
 
@@ -51,9 +61,13 @@ Leveling.Navigator
     ↓
 movement command
     ↓
-movement resolves / exits trigger
+`[Exits: ...]` starts capture
     ↓
 Leveling.RoomScanner
+    ↓
+mob lines are collected
+    ↓
+prompt containing `[TLSLVL]` completes capture
     ↓
 completed room contents
     ↓
@@ -74,9 +88,9 @@ Leveling command/function
 
 Starting an area remains a `Leveling` session responsibility. It resolves the area definition, configures RoomScanner with the unchanged `allowed_mobs` entries, passes only `dirs` to Navigator, and requests the first step through the compatibility `Leveling.processStep()` wrapper. That wrapper retains the pre-movement BuffManager call, while Navigator owns all route mechanics.
 
-Navigator arms RoomScanner with a callback tied to the current movement-attempt number, then sends the selected route step. The exits trigger is the existing success signal: RoomScanner accepts it, Navigator advances its route index exactly once, and RoomScanner begins capture. A movement failure keeps the same index and pauses with a deferred retry; as before, no movement retry timer exists, and the next combat/room progression signal requests the retry. Cancellation removes RoomScanner's callback and increments the attempt number, so an old callback cannot advance a stopped or replaced route. Combat and group-hold triggers pause Navigator and cancel the incomplete scan without sending another movement command.
+Navigator arms RoomScanner with a callback tied to the current movement-attempt number, then sends the selected route step. The `[Exits: ...]` trigger is the existing success signal: RoomScanner accepts it, Navigator advances its route index exactly once, and RoomScanner begins capture. Matching mob lines are collected until any prompt line containing the literal `[TLSLVL]` sentinel fires the finish trigger. RoomScanner deliberately ignores all surrounding prompt formatting. A movement failure keeps the same index and pauses with a deferred retry; as before, no movement retry timer exists, and the next combat/room progression signal requests the retry. Cancellation removes RoomScanner's callback and increments the attempt number, so an old callback cannot advance a stopped or replaced route. Combat and group-hold triggers pause Navigator and cancel the incomplete scan without sending another movement command.
 
-The prompt trigger finalizes one completed mob list. RoomScanner returns to idle before handing that list to `Leveling.handleRoomScanComplete()`, where existing combat logic attacks an eligible mob or advances the route. After the final confirmed step has been scanned and cleared, Navigator reports completion once through `Leveling.handleRouteComplete()`. Leveling preserves the existing status output, increments the completed-run statistic, and reloads the same area. The ignore list persists across those same-area loops and resets only when a different area is selected or leveling stops.
+The `[TLSLVL]` prompt-sentinel trigger finalizes one completed mob list. RoomScanner returns to idle before handing that list to `Leveling.handleRoomScanComplete()`, where existing combat logic attacks an eligible mob or advances the route. Without the sentinel, RoomScanner intentionally remains in capture because it cannot safely infer where arbitrary prompt output ends. After the final confirmed step has been scanned and cleared, Navigator reports completion once through `Leveling.handleRouteComplete()`. Leveling preserves the existing status output, increments the completed-run statistic, and reloads the same area. The ignore list persists across those same-area loops and resets only when a different area is selected or leveling stops.
 
 After a kill, RoomScanner owns the delayed `look` and arms the same capture lifecycle. Cancelling or stopping disables all three room triggers, cancels that timer, clears partial capture data, and returns the scanner to idle. A repeated scan request safely replaces an incomplete scan; unexpected line or end events cannot add persistent room data.
 

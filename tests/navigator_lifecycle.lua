@@ -60,8 +60,8 @@ Leveling = {
     end
 }
 
-dofile(root .. "/src/scripts/TLS-Leveling/RoomScanner.lua")
-dofile(root .. "/src/scripts/TLS-Leveling/Navigator.lua")
+dofile(root .. "/src/scripts/RoomScanner.lua")
+dofile(root .. "/src/scripts/Navigator.lua")
 
 local Navigator = Leveling.Navigator
 local RoomScanner = Leveling.RoomScanner

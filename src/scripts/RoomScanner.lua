@@ -9,7 +9,7 @@ RoomScanner.states = {
 }
 
 -- These are the only triggers RoomScanner owns. Their names must match
--- src/triggers/TLS-Leveling/triggers.json exactly.
+-- src/triggers/triggers.json exactly.
 RoomScanner.triggerNames = {
     start = "Start Capture Room",
     line = "Room Capture Things",

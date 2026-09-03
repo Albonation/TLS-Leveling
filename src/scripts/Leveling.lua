@@ -1,5 +1,8 @@
 Leveling = Leveling or {}
 
+Leveling.PROMPT_SENTINEL = "[TLSLVL]"
+Leveling.DEFAULT_PROMPT = "<%h/%H hp %e/%E end> " .. Leveling.PROMPT_SENTINEL
+
 Leveling.areas = {
     ["KoreSprings"] = {
         ["dirs"] = {
@@ -70,11 +73,7 @@ Leveling.areas = {
             },
             {
                 name = "troll",
-                description = "A trolloc solider screams and attacks",
-            },
-            {
-                name = "troll",
-                description = "A trolloc warrior stands here with a look of blood lust in his eyes",
+                description = "A trolloc soldier screams and attacks",
             }
         },
         ["description"] = "Start 1 east of the trolloc camp, in the blight.",
@@ -142,7 +141,7 @@ Leveling.areas = {
 }
 
 -- Mudlet trigger names are kept in one place so lifecycle calls can be checked
--- directly against src/triggers/TLS-Leveling/triggers.json.
+-- directly against src/triggers/triggers.json.
 local TRIGGERS = {
     killedMonster = "killed monster",
     flee = "Leveling Flee",
@@ -594,12 +593,24 @@ function Leveling.printRunStats()
     cecho(string.format(" Exp Per Hour:  <yellow>%12s<reset>| <yellow>%12s<reset>\n\n", formatNumber(runExpPerMinute * 60), formatNumber(totalExpPerMinute * 60)))
 end
 
+--- Configures the documented TLS-Leveling prompt only when explicitly invoked.
+--- The sentinel is a protocol marker; all other prompt formatting is user-owned.
+function Leveling.configurePrompt()
+    send("prompt " .. Leveling.DEFAULT_PROMPT)
+    cecho("\n<green>TLS-Leveling prompt configured.<reset>\n")
+    echo("The " .. Leveling.PROMPT_SENTINEL .. " marker is used to detect the end of room output.\n")
+    echo("You may customize the rest of your prompt as long as " .. Leveling.PROMPT_SENTINEL .. " remains present.\n")
+end
+
 function Leveling.printHelp()
     cecho("\n         <red>Leveling Script<reset>\n\n")
     cecho(" <yellow>Usage:<reset>\n")
     cecho("   Start area:             'leveling start [area name]'\n")
     cecho("   Stop script:            'leveling stop'\n")
     cecho("   Stats:                  'leveling stats'\n")
+    cecho("   Set recommended prompt: 'leveling setprompt'\n")
+    cecho("   TLS-Leveling requires [TLSLVL] somewhere in your MUD prompt.\n")
+    cecho("   You may customize the rest of the prompt freely.\n")
     cecho("  --------------------------------------------------------------------------\n")
     cecho("   Set <yellow>haste<reset> action:       'leveling haste [quaff off|c haste]'\n")
     cecho("   Set <white>sanc<reset> action:        'leveling sanc [quaff sanc|c sanc]'\n")

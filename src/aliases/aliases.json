@@ -1,7 +1,7 @@
 [
   {
     "name": "leveling",
-    "regex": "^leveling (start|haste|fury|detects|sanc|pka|init|ignore)(?: (.+))?$"
+    "regex": "^leveling(?: (start|haste|fury|detects|sanc|pka|init|ignore)(?: (.+))?)?$"
   },
   {
     "name": "leveling stop",

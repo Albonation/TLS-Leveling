@@ -18,6 +18,12 @@
     ]
   },
   {
+    "name": "Combat",
+    "eventHandlerList": [
+      "sysInstall"
+    ]
+  },
+  {
     "name": "BuffManager",
     "eventHandlerList": [
       "sysInstall"

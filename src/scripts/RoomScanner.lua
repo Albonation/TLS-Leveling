@@ -119,7 +119,7 @@ function RoomScanner:onLine(description)
     return true
 end
 
---- Finalizes a valid capture and hands its mob-name list to Leveling combat logic.
+--- Finalizes a valid capture and hands its mob-name list through Leveling to Combat.
 --- RoomScanner returns to idle before the callback, keeping the coupling one-way
 --- at the handoff point and allowing combat/navigation to request another scan.
 --- @return boolean finished Whether an active capture was completed.

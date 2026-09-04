@@ -1,1 +1,1 @@
-Leveling.handleKill(matches[2])
+Leveling.Combat:onKill(matches[2])

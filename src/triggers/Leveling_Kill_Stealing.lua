@@ -1,1 +1,1 @@
-Leveling.processStep()
+Leveling.Combat:onTargetUnavailable()

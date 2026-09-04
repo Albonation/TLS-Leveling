@@ -1,1 +1,1 @@
-Leveling.Navigator:pause("combat")
+Leveling.Combat:onStillFighting()

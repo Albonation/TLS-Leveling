@@ -1,1 +1,1 @@
-Leveling.stop()
+Leveling.Combat:onFlee()

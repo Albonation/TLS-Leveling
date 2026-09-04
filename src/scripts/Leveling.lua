@@ -143,11 +143,8 @@ Leveling.areas = {
 -- Mudlet trigger names are kept in one place so lifecycle calls can be checked
 -- directly against src/triggers/triggers.json.
 local TRIGGERS = {
-    killedMonster = "killed monster",
-    flee = "Leveling Flee",
     fury = "Leveling Fury",
     haste = "Leveling Haste",
-    killStealing = "Leveling Kill Stealing",
     detects = "Leveling Detects",
     sanc = "Leveling Sanc",
     moveWhileFighting = "Leveling Move While Fighting",
@@ -155,9 +152,6 @@ local TRIGGERS = {
 }
 
 local RUN_TRIGGERS = {
-    TRIGGERS.killedMonster,
-    TRIGGERS.flee,
-    TRIGGERS.killStealing,
     TRIGGERS.moveWhileFighting,
     TRIGGERS.tooMuchWeight
 }
@@ -221,13 +215,7 @@ function Leveling.setSanc(action)
 end
 
 function Leveling.setInit(action)
-    Leveling.initAction = normalizeAction(action)
-
-    if Leveling.initAction == "" then
-        Leveling.initAction = "kill"
-    else
-        cecho("\nInit action set to " .. Leveling.initAction)
-    end
+    return Leveling.Combat:setInit(action)
 end
 
 function Leveling.handleHaste()
@@ -246,69 +234,19 @@ function Leveling.handleSanc()
     Leveling.handleAction(Leveling.sancAction)
 end
 
---- Toggles every current-area mob whose name exactly matches the query or whose
---- description contains it. The ignore list stores attack keywords, not area data.
---- @param mobToIgnore string User-supplied mob name or description fragment.
+--- Compatibility wrapper for Combat's ignore configuration.
 function Leveling.handleIgnoreAction(mobToIgnore)
-    local query = string.lower(normalizeAction(mobToIgnore))
-    if query == "" then
-        return
-    end
-
-    local matchingNames = {}
-    local namesSeen = {}
-    local areaMobs = Leveling.currentArea and Leveling.currentArea["allowed_mobs"] or {}
-    for _, mob in ipairs(areaMobs) do
-        local mobName = string.lower(tostring(mob.name or ""))
-        local description = string.lower(tostring(mob.description or ""))
-        if (mobName == query or string.find(description, query, 1, true)) and not namesSeen[mobName] then
-            table.insert(matchingNames, mobName)
-            namesSeen[mobName] = true
-        end
-    end
-
-    for _, mobName in ipairs(matchingNames) do
-        local removed = false
-        for index = #Leveling.ignoredMobNames, 1, -1 do
-            if Leveling.ignoredMobNames[index] == mobName then
-                table.remove(Leveling.ignoredMobNames, index)
-                removed = true
-            end
-        end
-
-        if removed then
-            cecho("\nRemoved from ignore list: " .. mobName .. "\n")
-        else
-            table.insert(Leveling.ignoredMobNames, mobName)
-            cecho("\nAdded to ignore list: " .. mobName .. "\n")
-        end
-    end
+    return Leveling.Combat:handleIgnoreAction(mobToIgnore)
 end
 
---- Queues a command to run after combat. Actions are consumed in insertion order.
---- @param action string Command or semicolon-delimited command sequence.
---- @return boolean added Whether a non-empty action was queued.
+--- Compatibility wrapper for Combat's post-kill queue.
 function Leveling.addPostKillAction(action)
-    action = normalizeAction(action)
-    if action == "" then
-        return false
-    end
-
-    table.insert(Leveling.postKillActions, 1, action)
-    cecho("\nAdded a new post kill action: " .. action .. "\n")
-    return true
+    return Leveling.Combat:addPostKillAction(action)
 end
 
---- Executes and clears commands deferred until the current fight ended.
+--- Compatibility wrapper for integrations using the previous method name.
 function Leveling.doPostKillActions()
-    local numActions = #Leveling.postKillActions
-    Leveling.printDebug("doPostKillActions: numActions=" .. numActions)
-
-    for _ = 1, numActions do
-        local action = table.remove(Leveling.postKillActions)
-        local actions = string.split(action, "%s*;%s*")
-        sendAll(unpack(actions))
-    end
+    return Leveling.Combat:runPostKillActions()
 end
 
 --- Compatibility wrapper for integrations using the previous navigation API.
@@ -353,9 +291,7 @@ function Leveling.loadArea(areaName)
         Leveling.stats["total"]["time"] = os.time()
     end
 
-    if Leveling.currentAreaName ~= areaName then
-        Leveling.ignoredMobNames = {}
-    end
+    local preserveCombatIgnores = Leveling.currentAreaName == areaName
 
     -- Current leveling session
     Leveling.isRunning = true
@@ -363,6 +299,7 @@ function Leveling.loadArea(areaName)
     Leveling.currentArea = area
 
     Leveling.RoomScanner:configure(area["allowed_mobs"])
+    Leveling.Combat:configure(area["allowed_mobs"], preserveCombatIgnores)
     Leveling.Navigator:setRoute(area["dirs"])
 
     for _, triggerName in ipairs(RUN_TRIGGERS) do
@@ -380,31 +317,32 @@ function Leveling.loadArea(areaName)
     Leveling.processStep()
 end
 
---- Handles the experience line emitted after a kill: updates statistics, runs
---- deferred actions, resets room parsing, and schedules a fresh look command.
+--- Records one observed kill while keeping statistics owned by Leveling.
 --- @param expForKill string|number Experience captured by the Mudlet trigger.
-function Leveling.handleKill(expForKill)
+function Leveling.recordKill(expForKill)
     local experience = tonumber(expForKill) or 0
 
     Leveling.stats["this_run"]["mobs_killed"] = Leveling.stats["this_run"]["mobs_killed"] + 1
     Leveling.stats["this_run"]["exp"] = Leveling.stats["this_run"]["exp"] + experience
     Leveling.stats["total"]["mobs_killed"] = Leveling.stats["total"]["mobs_killed"] + 1
     Leveling.stats["total"]["exp"] = Leveling.stats["total"]["exp"] + experience
+end
 
-    Leveling.doPostKillActions()
-    Leveling.RoomScanner:requestLook(3)
+--- Compatibility wrapper for the pre-extraction kill handler.
+function Leveling.handleKill(expForKill)
+    return Leveling.Combat:onKill(expForKill)
 end
 
 --- Compatibility entry point retained for integrations using the old handler name.
 function Leveling.checkRoom(expForKill)
-    Leveling.handleKill(expForKill)
+    return Leveling.Combat:onKill(expForKill)
 end
 
---- Receives one completed room snapshot from RoomScanner and passes it to the
---- existing combat decision. This is the scanner's only callback into Leveling.
+--- Receives one completed room snapshot from RoomScanner and passes it to
+--- Combat. This compatibility handoff keeps RoomScanner decoupled from policy.
 --- @param roomMobs table Attack keywords found during the completed capture.
 function Leveling.handleRoomScanComplete(roomMobs)
-    Leveling.tryKill(roomMobs)
+    return Leveling.Combat:onRoomScanned(roomMobs)
 end
 
 -- Compatibility wrappers preserve the room handler names exposed by the first
@@ -433,28 +371,9 @@ function Leveling.pauseRoomScan()
     return Leveling.RoomScanner:cancel()
 end
 
---- Attacks the last eligible mob in a completed room snapshot, or advances the
---- route when no eligible mobs remain. RoomScanner owns capture, not this choice.
---- @param roomMobs table|nil Completed attack keywords from RoomScanner.
+--- Compatibility wrapper for the pre-extraction targeting entry point.
 function Leveling.tryKill(roomMobs)
-    roomMobs = roomMobs or {}
-    if #roomMobs == 0 then
-        Leveling.processStep()
-        return
-    end
-
-    local toKill = table.remove(roomMobs)
-    if table.contains(Leveling.ignoredMobNames, toKill) then
-        Leveling.tryKill(roomMobs)
-        return
-    end
-
-    cecho("<yellow>\nFound a match, kill it good.\n<reset>")
-    local actions = string.split(Leveling.initAction, "%s*;%s*")
-    for index, action in ipairs(actions) do
-        actions[index] = action .. " " .. toKill
-    end
-    sendAll(unpack(actions))
+    return Leveling.Combat:onRoomScanned(roomMobs)
 end
 
 --- Establishes all Leveling-owned state. This is also the one-time migration
@@ -462,7 +381,6 @@ end
 function Leveling.initialize()
     -- Configuration
     Leveling.debug = false
-    Leveling.initAction = "kill"
     Leveling.hasteAction = ""
     Leveling.furyAction = ""
     Leveling.sancAction = ""
@@ -472,10 +390,6 @@ function Leveling.initialize()
     Leveling.isRunning = false
     Leveling.currentAreaName = nil
     Leveling.currentArea = nil
-    -- Combat state
-    Leveling.ignoredMobNames = {}
-    Leveling.postKillActions = {}
-
     -- Clear fields owned by Leveling before RoomScanner was extracted.
     Leveling.currentAreaMobs = nil
     Leveling.currentRoomMobs = nil
@@ -505,15 +419,13 @@ end
 --- Stops navigation and combat automation, resets RoomScanner, disables run
 --- triggers, prints the completed session, and resets run statistics.
 function Leveling.stop()
+    Leveling.Combat:reset()
     Leveling.Navigator:reset()
     Leveling.RoomScanner:reset()
 
     Leveling.isRunning = false
     Leveling.currentAreaName = nil
     Leveling.currentArea = nil
-    Leveling.ignoredMobNames = {}
-    Leveling.postKillActions = {}
-
     for _, triggerName in ipairs(RUN_TRIGGERS) do
         disableTrigger(triggerName)
     end
@@ -536,7 +448,7 @@ function Leveling.resetRunStats()
 end
 
 --- Runs an action immediately, except cast commands (those beginning with "c"),
---- which are deferred until combat ends to avoid interfering with a fight.
+--- which are deferred until the next observed kill event.
 function Leveling.handleAction(action)
     action = normalizeAction(action)
     Leveling.printDebug("handleAction: " .. action)
@@ -546,7 +458,7 @@ function Leveling.handleAction(action)
 
     if string.starts(action, "c") then
         Leveling.printDebug("adding post kill action: " .. action)
-        table.insert(Leveling.postKillActions, 1, action)
+        Leveling.Combat:queuePostKillAction(action)
     else
         local actions = string.split(action, "%s*;%s*")
         sendAll(unpack(actions))
@@ -625,7 +537,7 @@ function Leveling.printStatus()
     cecho(" Haste action:   '" .. Leveling.hasteAction .. "'\n")
     cecho(" Sanc action:    '" .. Leveling.sancAction .. "'\n")
     cecho(" Detects action: '" .. Leveling.detectsAction .. "'\n")
-    cecho(" Init action:    '" .. Leveling.initAction .. "'\n\n")
+    cecho(" Init action:    '" .. Leveling.Combat.initAction .. "'\n\n")
 end
 
 function Leveling.printAreas()

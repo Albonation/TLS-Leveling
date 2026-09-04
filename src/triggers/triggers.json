@@ -211,6 +211,7 @@
   },
   {
     "name": "killed monster",
+    "isActive": false,
     "patterns":
     [
       {
@@ -254,6 +255,7 @@
   },
   {
     "name": "Still Fighting",
+    "isActive": false,
     "patterns":
     [
       {
@@ -264,6 +266,7 @@
   },
   {
     "name": "Leveling Flee",
+    "isActive": false,
     "patterns":
     [
       {
@@ -298,6 +301,7 @@
   },
   {
     "name": "Leveling Kill Stealing",
+    "isActive": false,
     "patterns":
     [
       {

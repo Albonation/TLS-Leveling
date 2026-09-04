@@ -17,6 +17,7 @@ end
 
 Leveling = nil
 dofile(root .. "/src/scripts/Leveling.lua")
+dofile(root .. "/src/scripts/AreaRepository.lua")
 
 local function assertEqual(actual, expected, message)
     if actual ~= expected then
@@ -34,7 +35,7 @@ assertEqual(string.find(confirmation, "TLS-Leveling prompt configured.", 1, true
 assertEqual(string.find(confirmation, "[TLSLVL] marker is used", 1, true) ~= nil, true,
     "sentinel purpose is printed")
 
-local trollocDefinitions = Leveling.areas["TrollocCamp"]["allowed_mobs"]
+local trollocDefinitions = Leveling.AreaRepository:get("TrollocCamp")["allowed_mobs"]
 assertEqual(#trollocDefinitions, 7, "TrollocCamp has seven unique definitions")
 local descriptionsSeen = {}
 local soldierDefinitionFound = false

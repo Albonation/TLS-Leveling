@@ -59,6 +59,7 @@ end
 
 Leveling = nil
 dofile(root .. "/src/scripts/Leveling.lua")
+dofile(root .. "/src/scripts/AreaRepository.lua")
 dofile(root .. "/src/scripts/RoomScanner.lua")
 dofile(root .. "/src/scripts/Navigator.lua")
 dofile(root .. "/src/scripts/Combat.lua")
@@ -67,7 +68,7 @@ BuffManager = {processBuffs = function() end}
 local Scanner = Leveling.RoomScanner
 local Navigator = Leveling.Navigator
 local Combat = Leveling.Combat
-local definitions = Leveling.areas.TrollocCamp.allowed_mobs
+local definitions = Leveling.AreaRepository:get("TrollocCamp").allowed_mobs
 local bloodlordDescription = "A bloodlord stands here studying the ancient books of legend"
 local bloodlordLine = "(M) (difficult) " .. bloodlordDescription
 local trollLine = "(M) (even match) A trolloc soldier screams and attacks"

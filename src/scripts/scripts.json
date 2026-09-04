@@ -6,6 +6,12 @@
     ]
   },
   {
+    "name": "AreaRepository",
+    "eventHandlerList": [
+      "sysInstall"
+    ]
+  },
+  {
     "name": "RoomScanner",
     "eventHandlerList": [
       "sysInstall"

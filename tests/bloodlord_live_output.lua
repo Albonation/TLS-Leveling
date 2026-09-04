@@ -71,6 +71,10 @@ local definitions = Leveling.areas.TrollocCamp.allowed_mobs
 local bloodlordDescription = "A bloodlord stands here studying the ancient books of legend"
 local bloodlordLine = "(M) (difficult) " .. bloodlordDescription
 local trollLine = "(M) (even match) A trolloc soldier screams and attacks"
+local scoutLine = "(M) (even match) A trolloc scout screams and attacks"
+local dreadlordLine = "(F) (difficult) A dreadlord stands here studying the books of knowledge"
+local darkhoundLine = "(M) (even match) A darkhound is standing here"
+local chiefLine = "(M) (difficult) A trolloc chieftain stands here with a wicked toothy grin"
 
 local function assertEqual(actual, expected, message)
     assert(actual == expected, message .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
@@ -99,7 +103,7 @@ end
 local function roomOutput(occupants)
     trigger("Start Capture Room", "Start_Capture_Room", {"[Exits: north east west]"})
     for _, line in ipairs(occupants) do
-        local difficulty, description = string.match(line, "^%(M%) %((.-)%) (.+)$")
+        local difficulty, description = string.match(line, "^%([^()]+%) %((.-)%) (.+)$")
         assert(description, "invalid room fixture")
         trigger("Room Capture Things", "Room_Capture_Things", {line, difficulty, description})
     end
@@ -138,6 +142,69 @@ end
 assertEqual(count, 1, "exactly one bloodlord definition exists")
 assertEqual(Combat.initAction, "kill", "default init action")
 
+-- Pin the complete intended roster by exact description, allowing the three
+-- distinct trolloc definitions to share their attack keyword.
+local expectedDefinitions = {
+    ["A trolloc warrior stands here with a look of blood lust in his eyes"] = "troll",
+    ["A trolloc scout screams and attacks"] = "troll",
+    ["A trolloc soldier screams and attacks"] = "troll",
+    [bloodlordDescription] = "bloodlord",
+    ["A dreadlord stands here studying the books of knowledge"] = "dreadlord",
+    ["A darkhound is standing here"] = "darkhound",
+    ["A trolloc chieftain stands here with a wicked toothy grin"] = "chief"
+}
+assertEqual(#definitions, 7, "TrollocCamp has exactly seven intended definitions")
+local descriptionsSeen = {}
+for _, mob in ipairs(definitions) do
+    assertEqual(mob.name, expectedDefinitions[mob.description], "only intended description/keyword pairs exist")
+    assertEqual(descriptionsSeen[mob.description], nil, "target definition is not duplicated")
+    descriptionsSeen[mob.description] = true
+end
+for description in pairs(expectedDefinitions) do
+    assertEqual(descriptionsSeen[description], true, "every intended target is configured")
+end
+
+-- Each new live line passes through the same capture/Combat path, including F.
+for _, target in ipairs({
+    {line = dreadlordLine, keyword = "dreadlord"},
+    {line = darkhoundLine, keyword = "darkhound"},
+    {line = chiefLine, keyword = "chief"}
+}) do
+    resetScenario()
+    roomOutput({target.line})
+    assertEqual(table.concat(snapshots[1], ","), target.keyword, "alone snapshot selects " .. target.keyword)
+    assertEqual(table.concat(sent, ","), "kill " .. target.keyword, "alone target sends exactly one attack")
+    assertEqual(Navigator.routeIndex, 1, "alone target does not advance route")
+    assertEqual(Navigator.state, Navigator.states.ready, "alone target does not attempt movement")
+end
+
+-- The word darkhound inside a different occupant description is not a match.
+for _, line in ipairs({
+    "(M) (even match) A mutated rat the size of a darkhound",
+    "(M) (even match) A cook stands here his eyes have seen things most men could not bare to see"
+}) do
+    resetScenario()
+    roomOutput({line})
+    assertEqual(#snapshots[1], 0, "unconfigured occupant is not a target")
+    assertEqual(table.concat(sent, ","), "w", "unconfigured occupant allows movement without an attack")
+end
+
+-- Fresh rescans select the last remaining occupant without target priorities.
+resetScenario()
+local remaining = {scoutLine, darkhoundLine, dreadlordLine, chiefLine}
+for index, keyword in ipairs({"chief", "dreadlord", "darkhound", "troll"}) do
+    roomOutput(remaining)
+    assertEqual(#snapshots[index], #remaining, "all remaining configured occupants stay eligible")
+    assertEqual(sent[#sent], "kill " .. keyword, "mixed room preserves last-occupant order")
+    assertEqual(Navigator.state, Navigator.states.ready, "mixed targets prevent movement attempts")
+    table.remove(remaining)
+    afterKill()
+end
+roomOutput({})
+assertEqual(table.concat(sent, ","),
+    "kill chief,look,kill dreadlord,look,kill darkhound,look,kill troll,look,w",
+    "all mixed targets are attacked across fresh rescans before navigation resumes")
+
 resetScenario()
 roomOutput({bloodlordLine})
 assertEqual(table.concat(snapshots[1], ","), "bloodlord", "alone snapshot contains bloodlord")
@@ -166,9 +233,14 @@ assertEqual(table.concat(sent, ","), "kill troll,look,kill bloodlord,look,kill b
     "bloodlord remaining after other mobs die stays eligible without movement")
 assertEqual(Navigator.routeIndex, 1, "mixed combat preserves route index")
 
--- Verified live recovery: rejected w -> kill -> look/clear room -> same w -> n.
+-- A resting mob is not a static target or a pause condition. The MUD may still
+-- reject the attempted movement: rejected w -> kill -> look -> same w -> n.
 resetScenario()
-Leveling.processStep()
+roomOutput({"(M) (even match) a trolloc warrior is resting on the ground."})
+assertEqual(#snapshots[1], 0, "temporary resting description is not a static target")
+assertEqual(Navigator.state, Navigator.states.moving, "resting mob does not pause navigation")
+assertEqual(Navigator.pauseReason, nil, "resting mob creates no pause reason")
+assertEqual(table.concat(sent, ","), "w", "resting mob allows the next movement attempt")
 local rejectedSuccess = Scanner.onStartCallback
 trigger("Leveling Move While Fighting", "Leveling_Move_While_Fighting",
     {"No way!  You are still fighting!"})
@@ -187,4 +259,4 @@ assertEqual(retrySuccess(), false, "duplicate success callback is ignored")
 assertEqual(Navigator.routeIndex, 2, "duplicate success does not advance again")
 assertEqual(table.concat(sent, ","), "w,look,w,n", "next route direction remains aligned")
 
-print("Bloodlord live-output and west-step recovery checks passed")
+print("TrollocCamp roster, bloodlord live-output, negative matching, and west-step recovery checks passed")

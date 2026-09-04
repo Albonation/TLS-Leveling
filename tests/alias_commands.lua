@@ -35,7 +35,7 @@ assertEqual(string.find(confirmation, "[TLSLVL] marker is used", 1, true) ~= nil
     "sentinel purpose is printed")
 
 local trollocDefinitions = Leveling.areas["TrollocCamp"]["allowed_mobs"]
-assertEqual(#trollocDefinitions, 4, "TrollocCamp has four unique definitions")
+assertEqual(#trollocDefinitions, 7, "TrollocCamp has seven unique definitions")
 local descriptionsSeen = {}
 local soldierDefinitionFound = false
 for _, mob in ipairs(trollocDefinitions) do

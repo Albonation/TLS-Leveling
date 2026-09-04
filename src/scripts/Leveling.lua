@@ -74,6 +74,10 @@ Leveling.areas = {
             {
                 name = "troll",
                 description = "A trolloc soldier screams and attacks",
+            },
+            {
+                name = "bloodlord",
+                description = "A bloodlord stands here studying the ancient books of legend",
             }
         },
         ["description"] = "Start 1 east of the trolloc camp, in the blight.",

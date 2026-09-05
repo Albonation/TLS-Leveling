@@ -15,7 +15,8 @@ Combat.triggerNames = {
     stillFighting = "Still Fighting",
     flee = "Leveling Flee",
     targetUnavailable = "Leveling Kill Stealing",
-    roundComplete = "Combat Round Complete"
+    roundComplete = "Combat Round Complete",
+    prompt = "Combat Prompt"
 }
 
 local function normalizeAction(action)
@@ -38,6 +39,14 @@ local function copyList(values)
     return copied
 end
 
+--- Clears only the transient cadence/release state. Tactical configuration is
+--- deliberately retained across session resets and reloads.
+function Combat:resetDuringCombatProgress()
+    self.combatRoundsSinceDuringCombatAction = 0
+    self.duringCombatActionDue = false
+    self.duringCombatActionAwaitingCombatContinuation = false
+end
+
 function Combat:enableTriggers()
     for _, triggerName in pairs(self.triggerNames) do
         enableTrigger(triggerName)
@@ -55,7 +64,7 @@ function Combat:reset()
     self:disableTriggers()
     self.state = self.states.idle
     self.pendingTarget = nil
-    self.combatRoundsSinceDuringCombatAction = 0
+    self:resetDuringCombatProgress()
     self.mobDefinitions = {}
     self.ignoredMobNames = {}
     self.postKillActions = {}
@@ -68,7 +77,7 @@ end
 function Combat:configure(mobDefinitions, preserveIgnores)
     self.state = self.states.idle
     self.pendingTarget = nil
-    self.combatRoundsSinceDuringCombatAction = 0
+    self:resetDuringCombatProgress()
     self.mobDefinitions = mobDefinitions or {}
     if not preserveIgnores then
         self.ignoredMobNames = {}
@@ -102,13 +111,13 @@ function Combat:setDuringCombatAction(action, roundInterval)
     end
     self.duringCombatAction = action
     self.duringCombatActionRoundInterval = interval
-    self.combatRoundsSinceDuringCombatAction = 0
+    self:resetDuringCombatProgress()
     return true
 end
 
 function Combat:disableDuringCombatAction()
     self.duringCombatAction = ""
-    self.combatRoundsSinceDuringCombatAction = 0
+    self:resetDuringCombatProgress()
 end
 
 --- Thin command-configuration boundary shared by the Leveling alias/wrapper.
@@ -130,29 +139,52 @@ function Combat:configureDuringCombat(configuration)
     return true
 end
 
---- Only this MUD-output event advances the round interval. Kills and other
---- callbacks neither advance it nor issue the periodic action.
+--- Only this MUD-output event advances the interval or proves that combat
+--- continued after a kill. It marks one action due; it never sends the action.
 function Combat:onCombatRoundComplete()
     if not Leveling.isRunning or self.state ~= self.states.engaged then return false end
+    if self.duringCombatActionDue then
+        self.duringCombatActionAwaitingCombatContinuation = false
+        return false
+    end
     self.combatRoundsSinceDuringCombatAction = self.combatRoundsSinceDuringCombatAction + 1
     if self.duringCombatAction == ""
         or self.combatRoundsSinceDuringCombatAction < self.duringCombatActionRoundInterval then
         return false
     end
 
+    self.combatRoundsSinceDuringCombatAction = 0
+    self.duringCombatActionDue = true
+    self.duringCombatActionAwaitingCombatContinuation = false
+    return true
+end
+
+--- Releases one due action only after the MUD has finished printing the round.
+--- A post-due kill makes that prompt ambiguous until another round proves the
+--- fight continued. Target templates are intentionally resolved at send time.
+function Combat:onPrompt()
+    if not Leveling.isRunning or self.state ~= self.states.engaged
+        or not self.duringCombatActionDue
+        or self.duringCombatActionAwaitingCombatContinuation then
+        return false
+    end
+    if self.duringCombatAction == "" then
+        self:resetDuringCombatProgress()
+        return false
+    end
     local action = self.duringCombatAction
     if action:find("{target}", 1, true) then
         -- pendingTarget is invalidated on kill, target failure, still-fighting
         -- uncertainty, and reset. Never retain a second/stale target cache.
         if not self.pendingTarget or self.pendingTarget == "" then
-            Leveling.printDebug("Skipping during-combat action: no current target is known.")
+            Leveling.printDebug("Keeping during-combat action due: no current target is known.")
             return false
         end
         action = action:gsub("{target}", function() return self.pendingTarget end)
     end
-    -- Consume the interval before send. Skipped target-dependent uses do not
-    -- accumulate queued copies: a later eligible summary sends at most one.
-    self.combatRoundsSinceDuringCombatAction = 0
+    -- Clear before send so a prompt callback can never release this use twice.
+    self.duringCombatActionDue = false
+    self.duringCombatActionAwaitingCombatContinuation = false
     send(action)
     return true
 end
@@ -258,7 +290,7 @@ end
 --- Applies every configured engage command to one attack keyword. Selecting
 --- another opponent while still engaged does not start a fresh round interval.
 function Combat:attack(target)
-    if self.state ~= self.states.engaged then self.combatRoundsSinceDuringCombatAction = 0 end
+    if self.state ~= self.states.engaged then self:resetDuringCombatProgress() end
     self.state = self.states.engaged
     self.pendingTarget = target
     cecho("<yellow>\nFound a match, kill it good.\n<reset>")
@@ -275,6 +307,9 @@ end
 --- ended: auto-aggro opponents may remain. Preserve the ongoing round interval.
 --- The existing scan/progression recovery is not an after-combat guarantee.
 function Combat:onKill(expForKill)
+    if self.duringCombatActionDue then
+        self.duringCombatActionAwaitingCombatContinuation = true
+    end
     self.state = self.states.engaged
     self.pendingTarget = nil
     Leveling.recordKill(expForKill)
@@ -334,6 +369,8 @@ function Combat:initialize()
     self.duringCombatAction = ""
     self.duringCombatActionRoundInterval = 1
     self.combatRoundsSinceDuringCombatAction = 0
+    self.duringCombatActionDue = false
+    self.duringCombatActionAwaitingCombatContinuation = false
     self.ignoredMobNames = {}
     self.postKillActions = {}
     self.mobDefinitions = {}
@@ -348,7 +385,7 @@ else
     -- Script reloads preserve configuration but not an uncertain engagement.
     Combat.state = Combat.states.idle
     Combat.pendingTarget = nil
-    Combat.combatRoundsSinceDuringCombatAction = 0
+    Combat:resetDuringCombatProgress()
     Combat:disableTriggers()
 end
 

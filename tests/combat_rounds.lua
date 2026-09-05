@@ -41,6 +41,10 @@ local function round()
     matches = {">You hit 20 times for an average 584 damage.", "20", "584"}
     dofile(root .. "/src/triggers/Combat_Round_Complete.lua")
 end
+local function prompt()
+    matches = {"<34450/34450 hp 66936/66936 end> [TLSLVL]"}
+    dofile(root .. "/src/triggers/Combat_Prompt.lua")
+end
 
 -- In-place removal decommissions only the package's old owner/API. No foreign
 -- global gets adopted, overwritten, or disabled; generic tactical helpers stay.
@@ -99,15 +103,22 @@ round()
 commands("", "unset during action sends nothing")
 equal(Combat.combatRoundsSinceDuringCombatAction, 2, "only round events increment count")
 
--- C/J: one literal action per completed round, without appended target/timers.
+-- C/J: a round marks one literal action due; the prompt releases it.
 setup("c 'primary weave'", 1)
 Combat:attack("troll")
 sent = {}
 local timersBefore = timerCalls
 round()
-commands("c 'primary weave'", "interval one first round")
+commands("", "interval one round handler never sends")
+equal(Combat.duringCombatActionDue, true, "interval one becomes due")
+prompt()
+commands("c 'primary weave'", "interval one prompt release")
+prompt()
+commands("c 'primary weave'", "duplicate prompt cannot release twice")
 round()
-commands("c 'primary weave',c 'primary weave'", "identical consecutive summaries are separate rounds")
+commands("c 'primary weave'", "second round is due but unsent")
+prompt()
+commands("c 'primary weave',c 'primary weave'", "second prompt releases second round")
 equal(Combat.combatRoundsSinceDuringCombatAction, 0, "successful use consumes interval")
 equal(timerCalls, timersBefore, "round actions introduce no timer")
 
@@ -118,13 +129,34 @@ sent = {}
 round()
 commands("", "interval two round one")
 round()
-commands("kick", "interval two round two")
+commands("", "interval two round two is due")
+prompt()
+commands("kick", "interval two round two prompt")
 round()
 commands("kick", "interval two round three")
 round()
-commands("kick,kick", "interval two round four")
+commands("kick", "interval two round four is due")
+prompt()
+commands("kick,kick", "interval two round four prompt")
+
+-- Live-tested interval three retains the same due-then-prompt cadence.
+setup("kick", 3)
+Combat:attack("troll")
+sent = {}
+round()
+round()
+commands("", "interval three first two rounds")
+equal(Combat.duringCombatActionDue, false, "interval three not early")
+round()
+commands("", "interval three due summary still sends nothing")
+equal(Combat.duringCombatActionDue, true, "interval three becomes due")
+prompt()
+commands("kick", "interval three prompt release")
 
 -- E: an idle -> attack engagement resets the count, not every target callback.
+setup("kick", 2)
+Combat:attack("troll")
+sent = {}
 round()
 equal(Combat.combatRoundsSinceDuringCombatAction, 1, "partial old interval")
 Combat:onTargetUnavailable()
@@ -134,7 +166,9 @@ sent = {}
 round()
 commands("", "new engagement needs its first full interval")
 round()
-commands("kick", "new engagement second round")
+commands("", "new engagement second round becomes due")
+prompt()
+commands("kick", "new engagement second round prompt")
 
 -- F: kill/auto-aggro/still-fighting/fresh target selection do not reset the
 -- continuing interval or issue a periodic action from a non-round callback.
@@ -150,13 +184,17 @@ Combat:onStillFighting()
 equal(Combat.combatRoundsSinceDuringCombatAction, 1, "still-fighting callback preserves count")
 commands("", "kill and still-fighting callbacks do not send periodic actions")
 round()
-commands("c 'primary weave'", "literal action continues after auto-aggro kill")
+commands("", "literal action becomes due after auto-aggro kill")
+prompt()
+commands("c 'primary weave'", "literal action releases at safe prompt")
 round()
 Combat:onRoomScanned({"bloodlord"})
 equal(Combat.combatRoundsSinceDuringCombatAction, 1, "next opponent within engagement preserves interval")
 sent = {}
 round()
-commands("c 'primary weave'", "next opponent continues the same cadence")
+commands("", "next opponent reaches same cadence")
+prompt()
+commands("c 'primary weave'", "next opponent safe prompt release")
 
 -- I: target templates use only the known current attack keyword. A due action
 -- with no target is skipped, with no stale fallback, queued copies, or timer.
@@ -165,28 +203,75 @@ Combat:attack("troll")
 sent = {}
 round()
 round()
-commands("c 'targeted weave' troll", "known target expansion")
+commands("", "known target action is due before prompt")
+prompt()
+commands("c 'targeted weave' troll", "known target expands at prompt")
 round()
 Combat:onKill(5)
 sent = {}
 round()
-round()
+prompt()
 commands("", "no dead/stale target emitted after kill")
-equal(Combat.combatRoundsSinceDuringCombatAction, 3, "skipped opportunity does not claim an action was sent")
+equal(Combat.duringCombatActionDue, true, "missing target keeps one action due")
+equal(Combat.combatRoundsSinceDuringCombatAction, 0, "due state is distinct from the counter")
 Combat:attack("bloodlord")
 sent = {}
 commands("", "target callback alone cannot release due round action")
 round()
-commands("c 'targeted weave' bloodlord", "next summary sends one action, without catch-up copies")
+commands("", "next summary proves continuation without sending")
+prompt()
+commands("c 'targeted weave' bloodlord", "prompt resolves current target without catch-up copies")
 equal(Combat.combatRoundsSinceDuringCombatAction, 0, "eventual use resets interval")
 Combat:onStillFighting()
 sent = {}
 round()
 round()
 commands("", "uncertain still-fighting target is not guessed")
+prompt()
+commands("", "prompt keeps target-dependent action due")
 Combat:onTargetUnavailable()
 round()
 commands("w", "target failure resumes existing movement without a stale cast")
+
+-- Critical live regression: a kill after the interval became due makes the
+-- immediately following prompt ambiguous. Another round proves continuation;
+-- repeated rounds retain only one due action and release with the new target.
+setup("kick {target}", 1)
+Combat:attack("troll")
+sent = {}
+round()
+equal(Combat.duringCombatActionDue, true, "action due against original target")
+commands("", "due round never sends from its summary")
+Combat:onKill(6)
+equal(Combat.duringCombatActionAwaitingCombatContinuation, true, "post-due kill marks ambiguity")
+prompt()
+commands("", "ambiguous immediate prompt cannot waste action")
+equal(Combat.duringCombatActionDue, true, "ambiguous prompt retains one due action")
+Combat:attack("bloodlord")
+sent = {}
+round()
+equal(Combat.duringCombatActionAwaitingCombatContinuation, false, "later round proves combat continued")
+round()
+round()
+equal(Combat.duringCombatActionDue, true, "additional rounds do not accumulate due copies")
+equal(Combat.combatRoundsSinceDuringCombatAction, 0, "counter pauses while action is due")
+commands("", "continuation rounds still never send directly")
+prompt()
+commands("kick bloodlord", "release-time target uses current safe opponent")
+prompt()
+commands("kick bloodlord", "released due action cannot repeat")
+
+-- Flee/reset remove due and ambiguity before their later prompt can fire.
+setup("kick", 1)
+Combat:attack("troll")
+sent = {}
+round()
+Combat:onKill(5)
+Combat:onFlee()
+equal(Combat.duringCombatActionDue, false, "flee/reset clears due")
+equal(Combat.duringCombatActionAwaitingCombatContinuation, false, "flee/reset clears ambiguity")
+prompt()
+commands("", "prompt after flee cannot release stale work")
 
 -- Literal really means literal: no target appended, no semicolon splitting or
 -- command-prefix classification for the one during-combat action.
@@ -194,6 +279,8 @@ setup("say {literal};look", 1)
 Combat:attack("troll")
 sent = {}
 round()
+commands("", "literal action waits for prompt")
+prompt()
 commands("say {literal};look", "one configured during-combat action is sent literally")
 equal(#sent, 1, "during action is not converted to a rotation/sequence")
 
@@ -204,8 +291,12 @@ equal(Combat.combatRoundsSinceDuringCombatAction, 0, "idle round ignored")
 commands("", "idle summary cannot send")
 Combat:attack("troll")
 round()
+round()
+equal(Combat.duringCombatActionDue, true, "stop scenario has due work")
 Leveling.stop()
 equal(Combat.combatRoundsSinceDuringCombatAction, 0, "stop clears round state")
+equal(Combat.duringCombatActionDue, false, "stop clears due state")
+equal(Combat.duringCombatActionAwaitingCombatContinuation, false, "stop clears ambiguity")
 equal(Combat.pendingTarget, nil, "stop clears target")
 equal(Combat.duringCombatAction, "kick", "stop preserves during action")
 equal(Combat.duringCombatActionRoundInterval, 2, "stop preserves interval")
@@ -213,6 +304,8 @@ equal(enabled["Combat Round Complete"], false, "stop disables round trigger")
 sent = {}
 round()
 commands("", "late summary after stop cannot send")
+prompt()
+commands("", "late prompt after stop cannot send")
 Combat.state = Combat.states.engaged
 round()
 equal(Combat.combatRoundsSinceDuringCombatAction, 0, "session guard applies even if engagement flag remains")
@@ -255,7 +348,9 @@ commands("c 'on-kill weave',stand,c 'on-kill weave',stand", "on-kill queue keeps
 equal(Combat.state, Combat.states.engaged, "post-kill is not after-combat")
 equal(Combat.combatRoundsSinceDuringCombatAction, 1, "user queue does not alter cadence")
 round()
-equal(sent[#sent], "kick", "round action still due after on-kill work")
+equal(sent[#sent], "stand", "round summary does not send after on-kill work")
+prompt()
+equal(sent[#sent], "kick", "prompt releases round action due after on-kill work")
 sent = {}
 Leveling.handleAction("c 'immediate weave';climb")
 commands("c 'immediate weave',climb", "generic immediate helper does not classify c as maintenance")
@@ -300,6 +395,8 @@ equal(Leveling.initAction, nil, "stale root field discarded")
 equal(Combat.duringCombatAction, "kick", "reload retains valid during configuration")
 equal(Combat.duringCombatActionRoundInterval, 3, "reload retains interval configuration")
 equal(Combat.combatRoundsSinceDuringCombatAction, 0, "reload clears transient round count")
+equal(Combat.duringCombatActionDue, false, "reload clears due state")
+equal(Combat.duringCombatActionAwaitingCombatContinuation, false, "reload clears ambiguity state")
 equal(Combat.pendingTarget, nil, "reload clears uncertain target")
 Leveling.Combat = nil
 Leveling.initAction = "bash;kill"
@@ -308,4 +405,4 @@ equal(Leveling.Combat.engageCombatAction, "bash;kill", "pre-extraction root init
 equal(Leveling.initAction, nil, "pre-extraction owner removed")
 equal(BuffManager, personal, "all tactical configuration leaves personal manager untouched")
 
-print("Combat rounds A-K, migration, aliases, literal/templates, multi-opponent cadence, and stop checks passed")
+print("Combat rounds and due/prompt A-L, migration, aliases, targets, multi-opponent cadence, and stop checks passed")

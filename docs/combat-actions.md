@@ -16,6 +16,8 @@ Combat owns these fields:
 - `duringCombatAction`: one periodic tactical command. Default empty/disabled.
 - `duringCombatActionRoundInterval`: positive integer completed-round interval. Default 1.
 - `combatRoundsSinceDuringCombatAction`: transient count since the last periodic use or interval reset.
+- `duringCombatActionDue`: one configured interval has been reached, but no automatic action has yet been safely sent.
+- `duringCombatActionAwaitingCombatContinuation`: a kill occurred after the action became due, so the next prompt cannot establish whether combat ended.
 
 User syntax:
 
@@ -55,15 +57,21 @@ Leveling.Combat:onCombatRoundComplete()
 
 Only this specified summary boundary counts. Dodge/opponent summaries, experience lines, and alternative zero-hit wording are not additional round signals. Identical summary text in successive rounds is valid and is not deduplicated by text. No timer defines combat cadence.
 
-The handler ignores events unless both the session is running and Combat is engaged. Otherwise it increments the completed-round counter. With no configured action it sends nothing. Before the interval is reached it sends nothing. At the interval, it sends exactly one configured action and resets the counter before sending. Thus interval 2 fires on summaries 2, 4, 6, etc.; other callbacks do not issue additional periodic actions.
+The handler ignores events unless both the session is running and Combat is engaged. Otherwise it increments the completed-round counter. With no configured action it sends nothing. Before the interval is reached it sends nothing. At the interval, it resets the counter to zero and sets `duringCombatActionDue`; it **never sends the action**. A dedicated inactive-by-default `Combat Prompt` trigger recognizes the existing `[TLSLVL]` substring and delegates only to `Leveling.Combat:onPrompt()`.
 
-An idle-to-attack transition starts a fresh interval. Selecting another target while Combat remains engaged does not. Configure/reset/stop/reload and explicit round-action configuration changes clear the counter. **An individual kill never resets it.** The existing Combat `idle` state is an orchestration state, not proof that the MUD has no remaining opponents.
+In the normal case, that prompt arrives after all consequences of the due round have printed. If Combat is still engaged, the session is running, the action remains due, and no post-due kill ambiguity exists, `onPrompt()` sends exactly one action and clears due before sending. Repeated prompts cannot repeat it. Interval 2 therefore normally releases after summaries 2, 4, 6, etc., but release is intentionally later than recognition of those summaries.
+
+If a kill occurs after the action becomes due, `onKill()` preserves all existing statistics, user post-kill work, rescan behavior, engagement, and cadence, while setting `duringCombatActionAwaitingCombatContinuation`. The immediately following prompt cannot release the automatic action. This prevents the live sequence `round summary → action → death → You aren't fighting anyone.` A later completed combat round is sufficient positive evidence that another fight round occurred and clears this ambiguity. If another kill follows that evidence before its prompt, ambiguity is set again. No opponent count, room guess, or timer is involved.
+
+While an action is due, subsequent completed rounds keep exactly that one due action. They do not increment the counter or enqueue additional uses; their only special effect is proving continuation after a post-due kill. Once the prompt successfully releases the action, the next round begins a fresh interval from zero. This retains the normal interval cadence while preventing catch-up bursts after a delayed release.
+
+An idle-to-attack transition starts a fresh interval and clears due/ambiguity from any prior engagement. Selecting another target while Combat remains engaged does not. Configure/reset/stop/flee/reload and explicit round-action configuration changes clear the counter, due, and ambiguity. **An individual kill never resets the ongoing cadence or due action.** The existing Combat `idle` state is an orchestration state, not proof that the MUD has no remaining opponents.
 
 ## Targets and multi-opponent uncertainty
 
 A during-combat action without `{target}` is sent literally, without an appended target or semicolon splitting. Exactly one action is supported, not a rotation. The MUD/user's chosen command determines whether an implicit opponent is meaningful.
 
-An action containing `{target}` substitutes the current `Combat.pendingTarget` attack keyword, with no second target cache. Kill, target-unavailable, still-fighting uncertainty, and reset clear that known target. If it is unavailable, the due use is skipped; debug mode explains why. The counter stays due because no action was sent. Once an attack establishes a fresh known target, only a subsequent summary can issue the action, at most once; skipped opportunities never create catch-up copies or timers.
+An action containing `{target}` substitutes the current `Combat.pendingTarget` attack keyword **at prompt release time**, with no target snapshot or second cache. Kill, target-unavailable, still-fighting uncertainty, and reset clear that known target. If it is unavailable, the prompt keeps the single action due and sends nothing; debug mode explains why. Once an attack establishes a fresh known target, a subsequent round proves continuation and its prompt can release the action using that new target. The original/dead target is never emitted, and skipped opportunities never create catch-up copies or timers. Literal actions use the same prompt/ambiguity boundary without needing a target.
 
 Kills retain engagement and round cadence while invalidating the possibly dead target. Literal actions can therefore continue through auto-aggro/multi-opponent combat, while targeted actions wait for safe target knowledge. The existing post-kill look, still-fighting pause, resting-description behavior, target order, and movement rejection/retry remain unchanged. In particular, an empty configured-target scan is not repurposed as proof of combat ending.
 
@@ -77,13 +85,13 @@ Personal maintenance remains independent and may continue issuing its own comman
 
 ## Regression coverage and verification
 
-`tests/combat_rounds.lua` covers A–K: engage compatibility; unset action; intervals 1 and 2; fresh engagement reset; continuing multi-opponent cadence across kills; stop and idle guards; safe target expansion; literal commands; and atomic invalid-interval rejection. It also exercises the real alias/round adapters, skipped-target recovery without queued copies, explicit disable/reconfigure, v1/root migration, reload preservation, on-kill duplicates, generic immediate actions, removal cleanup, and foreign-global isolation.
+`tests/combat_rounds.lua` covers the original A–K tactical configuration/cadence behavior plus due/prompt A–L: interval becomes due without sending; single prompt release and duplicate-prompt suppression; kill-after-due ambiguity; later-round continuation; cadence across ordinary multi-opponent kills; non-accumulating due rounds; stop/flee/reset/new-engagement cleanup; release-time target change; literal release; and stopped-session guards. It exercises the real alias, round, and prompt adapters, skipped-target recovery without queued copies, explicit disable/reconfigure, v1/root migration, reload preservation, on-kill duplicates, generic immediate actions, removal cleanup, and foreign-global isolation.
 
 The six non-buff suites remain: alias commands, AreaRepository, bloodlord live output, Combat lifecycle, Navigator lifecycle, and RoomScanner live output. Their area/target/recovery assertions remain intact; obsolete maintenance fixtures and old authoritative-field expectations were updated. The buff-only suite was removed. CI continues to run every `tests/*.lua` under Lua 5.1 before the unchanged Muddler build/upload.
 
 Local verification passed: all seven suites under native Lua 5.1.5; Lua 5.1 parsing of 33 authored Lua files; four valid JSON metadata files including `mfile`; positive/negative round-regex and alias-reachability checks; Muddler 1.1.0 build and generated XML adapter/lifecycle checks; no unintended top-level globals; and `git diff --check`. Navigator, RoomScanner, AreaRepository, movement/group adapters, and Stats calculation/reporting functions were checked unchanged. The updated CI has not been executed on GitHub during this local pass.
 
-Live checks should use a valid route starting room and `[TLSLVL]` prompt: confirm legacy init behavior; verify interval 1 and interval 2 on actual matching summaries; keep fighting through an individual kill and check cadence; repeat with a `{target}` action and confirm no dead-target fallback; stop mid-interval and confirm silence from the package. No live MUD actions were issued during implementation.
+Live checks should use a valid route starting room and `[TLSLVL]` prompt: (1) reach an interval on a non-kill round and confirm the action appears only after its prompt; (2) make the due round kill the final opponent and confirm its immediate prompt sends nothing; (3) make a due round kill one opponent while combat continues, then confirm the later round and prompt release exactly once; (4) repeat with `{target}` and confirm the replacement opponent's keyword is used; (5) stop after the due summary but before its prompt and confirm silence. No live MUD actions were issued during implementation.
 
 ## Recommended next pass
 

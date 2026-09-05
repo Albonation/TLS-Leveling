@@ -11,6 +11,17 @@
     ]
   },
   {
+    "name": "Combat Prompt",
+    "isActive": false,
+    "patterns":
+    [
+      {
+        "pattern": "[TLSLVL]",
+        "type": "substring"
+      }
+    ]
+  },
+  {
     "name": "killed monster",
     "isActive": false,
     "patterns":

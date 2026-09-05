@@ -75,7 +75,6 @@ assertEqual(Leveling.currentArea, nil, "repository does not select an area")
 dofile(root .. "/src/scripts/RoomScanner.lua")
 dofile(root .. "/src/scripts/Navigator.lua")
 dofile(root .. "/src/scripts/Combat.lua")
-dofile(root .. "/src/scripts/BuffManager.lua")
 
 local Repository = Leveling.AreaRepository
 local Navigator = Leveling.Navigator
@@ -139,11 +138,6 @@ for _, mob in ipairs(trolloc.allowed_mobs) do
 end
 
 -- The actual start alias uses the repository through Leveling orchestration.
-for buff in pairs(BuffManager.buffs) do
-    BuffManager.buffs[buff] = true
-end
-BuffManager.buffs.quickness = false
-Leveling.setHaste("quaff off")
 matches = {"leveling start TrollocCamp", "start", "TrollocCamp"}
 dofile(root .. "/src/aliases/leveling.lua")
 assertEqual(Leveling.currentAreaName, "TrollocCamp", "session owns the chosen canonical name")
@@ -152,9 +146,7 @@ assertEqual(Scanner.mobDefinitions, trolloc.allowed_mobs, "Leveling configures s
 assertEqual(Combat.mobDefinitions, trolloc.allowed_mobs, "Leveling configures combat definitions")
 assertEqual(table.concat(Navigator.route, ","), routeBefore, "full configured route reaches Navigator unchanged")
 assert(Navigator.route ~= trolloc.dirs, "Navigator retains its own execution copy")
-assertEqual(table.concat(sent, ","), "quickness,aff,w", "buff restoration still precedes the first route step")
-assertEqual(enabledTriggers["Leveling Haste"], true, "configured buff trigger remains active")
-BuffManager.buffs.quickness = true
+assertEqual(table.concat(sent, ","), "w", "starting an area performs navigation without character maintenance")
 Leveling.handleIgnoreAction("bloodlord")
 local activeAttempt = Navigator.activeAttemptId
 local commandsBefore = #sent

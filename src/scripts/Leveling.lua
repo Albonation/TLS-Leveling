@@ -6,13 +6,21 @@ Leveling.DEFAULT_PROMPT = "<%h/%H hp %e/%E end> " .. Leveling.PROMPT_SENTINEL
 -- Discard the old static-data field when reloading a pre-extraction package.
 Leveling.areas = nil
 
+-- Retire only this package's old maintenance API on an in-place upgrade.
+-- Never touch the unrelated global BuffManager or personal profile triggers.
+if Leveling.BuffManager then Leveling.BuffManager:stop() end
+for _, field in ipairs({
+    "BuffManager", "hasteAction", "sancAction", "detectsAction", "furyAction",
+    "setHaste", "setSanc", "setDetects", "setFury", "setCoreBuffs",
+    "handleHaste", "handleSanc", "handleDetects", "handleFury",
+    "buffMaintenanceOutsideCombat"
+}) do
+    Leveling[field] = nil
+end
+
 -- Mudlet trigger names are kept in one place so lifecycle calls can be checked
 -- directly against src/triggers/triggers.json.
 local TRIGGERS = {
-    fury = "Leveling Fury",
-    haste = "Leveling Haste",
-    detects = "Leveling Detects",
-    sanc = "Leveling Sanc",
     moveWhileFighting = "Leveling Move While Fighting",
     tooMuchWeight = "Leveling Too Much Weight"
 }
@@ -32,72 +40,13 @@ function Leveling.printDebug(message)
     end
 end
 
-function Leveling.setHaste(action)
-    Leveling.hasteAction = normalizeAction(action)
-
-    if Leveling.hasteAction == "" then
-        cecho("\nHaste action disabled.\n")
-        disableTrigger(TRIGGERS.haste)
-    else
-        cecho("\nHaste action set to: " .. Leveling.hasteAction .. "\n")
-        enableTrigger(TRIGGERS.haste)
-    end
-end
-
-function Leveling.setFury(action)
-    Leveling.furyAction = normalizeAction(action)
-
-    if Leveling.furyAction == "" then
-        cecho("\nFury disabled\n")
-        disableTrigger(TRIGGERS.fury)
-    else
-        cecho("\nFury enabled\n")
-        enableTrigger(TRIGGERS.fury)
-    end
-end
-
-function Leveling.setDetects(action)
-    Leveling.detectsAction = normalizeAction(action)
-
-    if Leveling.detectsAction == "" then
-        cecho("\nDetects disabled.\n")
-        disableTrigger(TRIGGERS.detects)
-    else
-        cecho("\nDetects action set to: " .. Leveling.detectsAction .. "\n")
-        enableTrigger(TRIGGERS.detects)
-    end
-end
-
-function Leveling.setSanc(action)
-    Leveling.sancAction = normalizeAction(action)
-
-    if Leveling.sancAction == "" then
-        cecho("\nSanc action disabled.\n")
-        disableTrigger(TRIGGERS.sanc)
-    else
-        cecho("\nSanc action set to: " .. Leveling.sancAction .. "\n")
-        enableTrigger(TRIGGERS.sanc)
-    end
-end
-
+--- Legacy user-facing name; Combat owns the authoritative engage action.
 function Leveling.setInit(action)
     return Leveling.Combat:setInit(action)
 end
 
-function Leveling.handleHaste()
-    Leveling.handleAction(Leveling.hasteAction)
-end
-
-function Leveling.handleFury()
-    send("fury")
-end
-
-function Leveling.handleDetects()
-    Leveling.handleAction(Leveling.detectsAction)
-end
-
-function Leveling.handleSanc()
-    Leveling.handleAction(Leveling.sancAction)
+function Leveling.setDuringCombat(configuration)
+    return Leveling.Combat:configureDuringCombat(configuration)
 end
 
 --- Compatibility wrapper for Combat's ignore configuration.
@@ -120,10 +69,9 @@ function Leveling.redoLastStep()
     return Leveling.Navigator:onMovementFailure("movement blocked")
 end
 
---- Applies buffs before delegating all route mechanics to Navigator.
---- This wrapper remains because combat and existing integrations advance here.
+--- Session guard and compatibility handoff; Navigator owns route mechanics.
 function Leveling.processStep()
-    BuffManager.processBuffs()
+    if not Leveling.isRunning then return false end
     return Leveling.Navigator:processStep()
 end
 
@@ -171,12 +119,6 @@ function Leveling.loadArea(areaName)
     for _, triggerName in ipairs(RUN_TRIGGERS) do
         enableTrigger(triggerName)
     end
-
-    -- Reapply configurable trigger state after stop() disabled it.
-    Leveling.setFury(Leveling.furyAction)
-    Leveling.setHaste(Leveling.hasteAction)
-    Leveling.setSanc(Leveling.sancAction)
-    Leveling.setDetects(Leveling.detectsAction)
 
     cecho("<purple>Area loaded. Let's do this!<reset>\n")
     Leveling.stats["this_run"]["time"] = os.time()
@@ -247,10 +189,6 @@ end
 function Leveling.initialize()
     -- Configuration
     Leveling.debug = false
-    Leveling.hasteAction = ""
-    Leveling.furyAction = ""
-    Leveling.sancAction = ""
-    Leveling.detectsAction = ""
 
     -- Current leveling session
     Leveling.isRunning = false
@@ -295,10 +233,6 @@ function Leveling.stop()
     for _, triggerName in ipairs(RUN_TRIGGERS) do
         disableTrigger(triggerName)
     end
-    disableTrigger(TRIGGERS.haste)
-    disableTrigger(TRIGGERS.fury)
-    disableTrigger(TRIGGERS.detects)
-    disableTrigger(TRIGGERS.sanc)
 
     Leveling.printRunStats()
     Leveling.resetRunStats()
@@ -313,22 +247,13 @@ function Leveling.resetRunStats()
     }
 end
 
---- Runs an action immediately, except cast commands (those beginning with "c"),
---- which are deferred until the next observed kill event.
+--- Generic immediate-action compatibility helper. Timing is explicit: use
+--- addPostKillAction for on-kill work, regardless of the command's first letter.
 function Leveling.handleAction(action)
     action = normalizeAction(action)
-    Leveling.printDebug("handleAction: " .. action)
-    if action == "" then
-        return
-    end
-
-    if string.starts(action, "c") then
-        Leveling.printDebug("adding post kill action: " .. action)
-        Leveling.Combat:queuePostKillAction(action)
-    else
-        local actions = string.split(action, "%s*;%s*")
-        sendAll(unpack(actions))
-    end
+    if action == "" then return end
+    local actions = string.split(action, "%s*;%s*")
+    sendAll(unpack(actions))
 end
 
 local function safeAverage(total, count)
@@ -390,20 +315,20 @@ function Leveling.printHelp()
     cecho("   TLS-Leveling requires [TLSLVL] somewhere in your MUD prompt.\n")
     cecho("   You may customize the rest of the prompt freely.\n")
     cecho("  --------------------------------------------------------------------------\n")
-    cecho("   Set <yellow>haste<reset> action:       'leveling haste [quaff off|c haste]'\n")
-    cecho("   Set <white>sanc<reset> action:        'leveling sanc [quaff sanc|c sanc]'\n")
-    cecho("   Set <purple>detects<reset> action:     'leveling detects [quaff glit|c 'detect h']\n")
-    cecho("   Add post kill action:   'leveling pka [action]'\n")
-    cecho("   Set init action:        'leveling init [action]' - NOTE use | to separate commands, like dismis|call|order all kill\n")
+    cecho("   Engage combat action:   'leveling engage [action]' ('init' also supported)\n")
+    cecho("   Engage sequences use ; and append the target to each command.\n")
+    cecho("   During combat:          'leveling duringcombat <rounds> <action>'\n")
+    cecho("   Disable round action:   'leveling duringcombat off'\n")
+    cecho("   Rounds must be a positive integer; optional {target} requires a known target.\n")
+    cecho("   Add on-kill action:     'leveling pka [action]' (not after combat)\n")
     cecho("   List areas:             'leveling areas'\n\n")
 end
 
 function Leveling.printStatus()
     cecho("\n<red>      Current Leveling Status<reset>\n\n")
-    cecho(" Haste action:   '" .. Leveling.hasteAction .. "'\n")
-    cecho(" Sanc action:    '" .. Leveling.sancAction .. "'\n")
-    cecho(" Detects action: '" .. Leveling.detectsAction .. "'\n")
-    cecho(" Init action:    '" .. Leveling.Combat.initAction .. "'\n\n")
+    cecho(" Engage combat action:        '" .. Leveling.Combat.engageCombatAction .. "'\n")
+    cecho(" During-combat action:        '" .. Leveling.Combat.duringCombatAction .. "'\n")
+    cecho(" During-combat round interval: " .. Leveling.Combat.duringCombatActionRoundInterval .. "\n")
 end
 
 function Leveling.printAreas()

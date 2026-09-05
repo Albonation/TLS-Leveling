@@ -14,6 +14,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Lua 5.1
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Lua regression suites
+        run: |
+          set -e
+          for suite in tests/*.lua; do
+            lua5.1 "$suite"
+          done
+
       - name: Muddle
         uses: demonnic/build-with-muddler@v1.3
 

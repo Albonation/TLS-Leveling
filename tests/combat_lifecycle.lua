@@ -134,7 +134,8 @@ local function resetScenario()
 end
 
 -- Existing user configuration/state migrates once and loses its old owner.
-assertEqual(Combat.initAction, "bash;kill", "legacy init action migrates")
+assertEqual(Combat.engageCombatAction, "bash;kill", "legacy init action migrates")
+assertEqual(Combat.initAction, nil, "no second Combat init configuration remains")
 assertEqual(Combat.ignoredMobNames[1], "rat", "legacy ignore migrates")
 assertEqual(Combat.postKillActions[1], "stand", "legacy post-kill action migrates")
 assertEqual(Leveling.initAction, nil, "legacy init owner is cleared")
@@ -245,7 +246,7 @@ assertEqual(Combat.pendingTarget, nil, "stop clears pending target")
 assertEqual(#Combat.ignoredMobNames, 0, "stop clears ignores")
 assertEqual(#Combat.postKillActions, 0, "stop clears deferred actions")
 assertEqual(#Combat.mobDefinitions, 0, "stop clears area combat definitions")
-assertEqual(Combat.initAction, "bash;kill", "stop preserves init configuration")
+assertEqual(Combat.engageCombatAction, "bash;kill", "stop preserves engage configuration")
 assertEqual(navigatorResets, 1, "stop resets Navigator")
 assertEqual(scannerResets, 1, "stop resets RoomScanner")
 assertEqual(lookPending, false, "stop cancels pending look through RoomScanner")

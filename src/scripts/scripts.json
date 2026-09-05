@@ -28,11 +28,5 @@
     "eventHandlerList": [
       "sysInstall"
     ]
-  },
-  {
-    "name": "BuffManager",
-    "eventHandlerList": [
-      "sysInstall"
-    ]
   }
 ]

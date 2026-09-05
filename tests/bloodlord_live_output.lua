@@ -63,7 +63,6 @@ dofile(root .. "/src/scripts/AreaRepository.lua")
 dofile(root .. "/src/scripts/RoomScanner.lua")
 dofile(root .. "/src/scripts/Navigator.lua")
 dofile(root .. "/src/scripts/Combat.lua")
-BuffManager = {processBuffs = function() end}
 
 local Scanner = Leveling.RoomScanner
 local Navigator = Leveling.Navigator
@@ -122,6 +121,7 @@ local function afterKill()
 end
 
 local function resetScenario()
+    Leveling.isRunning = true
     Combat:reset()
     Navigator:reset()
     Scanner:configure(definitions)
@@ -141,7 +141,7 @@ for _, mob in ipairs(definitions) do
     end
 end
 assertEqual(count, 1, "exactly one bloodlord definition exists")
-assertEqual(Combat.initAction, "kill", "default init action")
+assertEqual(Combat.engageCombatAction, "kill", "default engage action")
 
 -- Pin the complete intended roster by exact description, allowing the three
 -- distinct trolloc definitions to share their attack keyword.

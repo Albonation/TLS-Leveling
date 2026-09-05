@@ -1,6 +1,7 @@
 Leveling.Combat = Leveling.Combat or {}
 
 local Combat = Leveling.Combat
+local previousEngageAction = Combat.engageCombatAction or Combat.initAction or Leveling.initAction
 
 Combat.states = {
     idle = "idle",
@@ -8,16 +9,25 @@ Combat.states = {
 }
 
 -- These are the combat-specific triggers controlled with the leveling session.
--- Movement failures, room capture, death, and buff triggers have other owners.
+-- Movement failures, room capture, and death triggers have other owners.
 Combat.triggerNames = {
     killedMonster = "killed monster",
     stillFighting = "Still Fighting",
     flee = "Leveling Flee",
-    targetUnavailable = "Leveling Kill Stealing"
+    targetUnavailable = "Leveling Kill Stealing",
+    roundComplete = "Combat Round Complete"
 }
 
 local function normalizeAction(action)
     return string.trim(tostring(action or ""))
+end
+
+local function normalizeRoundInterval(value)
+    local interval = tonumber(value)
+    if not interval or interval < 1 or interval >= math.huge or interval ~= math.floor(interval) then
+        return nil
+    end
+    return interval
 end
 
 local function copyList(values)
@@ -40,11 +50,12 @@ function Combat:disableTriggers()
     end
 end
 
---- Clears transient and per-session combat state while preserving initAction.
+--- Clears transient/per-session state while preserving tactical configuration.
 function Combat:reset()
     self:disableTriggers()
     self.state = self.states.idle
     self.pendingTarget = nil
+    self.combatRoundsSinceDuringCombatAction = 0
     self.mobDefinitions = {}
     self.ignoredMobNames = {}
     self.postKillActions = {}
@@ -57,6 +68,7 @@ end
 function Combat:configure(mobDefinitions, preserveIgnores)
     self.state = self.states.idle
     self.pendingTarget = nil
+    self.combatRoundsSinceDuringCombatAction = 0
     self.mobDefinitions = mobDefinitions or {}
     if not preserveIgnores then
         self.ignoredMobNames = {}
@@ -66,13 +78,83 @@ end
 
 --- Sets the command sequence used to initiate combat.
 --- @param action string Semicolon-delimited command sequence.
-function Combat:setInit(action)
-    self.initAction = normalizeAction(action)
-    if self.initAction == "" then
-        self.initAction = "kill"
+function Combat:setEngageCombatAction(action)
+    self.engageCombatAction = normalizeAction(action)
+    if self.engageCombatAction == "" then
+        self.engageCombatAction = "kill"
     else
-        cecho("\nInit action set to " .. self.initAction)
+        cecho("\nEngage combat action set to " .. self.engageCombatAction)
     end
+end
+
+--- Public compatibility name; no second initAction configuration is stored.
+function Combat:setInit(action)
+    return self:setEngageCombatAction(action)
+end
+
+--- Configures one literal/template command, not a rotation or command queue.
+--- Invalid edits are atomic. A valid change starts a fresh interval.
+function Combat:setDuringCombatAction(action, roundInterval)
+    local interval = normalizeRoundInterval(roundInterval)
+    action = normalizeAction(action)
+    if not interval or action == "" then
+        return false, "During-combat actions require a positive integer round interval and a nonempty action."
+    end
+    self.duringCombatAction = action
+    self.duringCombatActionRoundInterval = interval
+    self.combatRoundsSinceDuringCombatAction = 0
+    return true
+end
+
+function Combat:disableDuringCombatAction()
+    self.duringCombatAction = ""
+    self.combatRoundsSinceDuringCombatAction = 0
+end
+
+--- Thin command-configuration boundary shared by the Leveling alias/wrapper.
+function Combat:configureDuringCombat(configuration)
+    configuration = normalizeAction(configuration)
+    if configuration == "off" then
+        self:disableDuringCombatAction()
+        cecho("\nDuring-combat action disabled.\n")
+        return true
+    end
+    local rounds, action = configuration:match("^(%d+)%s+(.+)$")
+    local accepted, reason = self:setDuringCombatAction(action, rounds)
+    if not accepted then
+        cecho("\n" .. reason .. " Use: leveling duringcombat <rounds> <action>, or off.\n")
+        return false
+    end
+    cecho("\nDuring-combat action set to " .. self.duringCombatAction
+        .. " every " .. self.duringCombatActionRoundInterval .. " completed round(s).\n")
+    return true
+end
+
+--- Only this MUD-output event advances the round interval. Kills and other
+--- callbacks neither advance it nor issue the periodic action.
+function Combat:onCombatRoundComplete()
+    if not Leveling.isRunning or self.state ~= self.states.engaged then return false end
+    self.combatRoundsSinceDuringCombatAction = self.combatRoundsSinceDuringCombatAction + 1
+    if self.duringCombatAction == ""
+        or self.combatRoundsSinceDuringCombatAction < self.duringCombatActionRoundInterval then
+        return false
+    end
+
+    local action = self.duringCombatAction
+    if action:find("{target}", 1, true) then
+        -- pendingTarget is invalidated on kill, target failure, still-fighting
+        -- uncertainty, and reset. Never retain a second/stale target cache.
+        if not self.pendingTarget or self.pendingTarget == "" then
+            Leveling.printDebug("Skipping during-combat action: no current target is known.")
+            return false
+        end
+        action = action:gsub("{target}", function() return self.pendingTarget end)
+    end
+    -- Consume the interval before send. Skipped target-dependent uses do not
+    -- accumulate queued copies: a later eligible summary sends at most one.
+    self.combatRoundsSinceDuringCombatAction = 0
+    send(action)
+    return true
 end
 
 --- Toggles every configured attack keyword selected by exact name or by a
@@ -173,13 +255,15 @@ function Combat:onRoomScanned(roomMobs)
     return false
 end
 
---- Applies every configured init command to one attack keyword.
+--- Applies every configured engage command to one attack keyword. Selecting
+--- another opponent while still engaged does not start a fresh round interval.
 function Combat:attack(target)
+    if self.state ~= self.states.engaged then self.combatRoundsSinceDuringCombatAction = 0 end
     self.state = self.states.engaged
     self.pendingTarget = target
     cecho("<yellow>\nFound a match, kill it good.\n<reset>")
 
-    local actions = string.split(self.initAction, "%s*;%s*")
+    local actions = string.split(self.engageCombatAction, "%s*;%s*")
     for index, action in ipairs(actions) do
         actions[index] = action .. " " .. target
     end
@@ -188,8 +272,8 @@ function Combat:attack(target)
 end
 
 --- Handles each experience event independently. A kill does not imply combat
---- ended: auto-aggro opponents may remain, so engagement lasts until a clear
---- completed room scan or another explicit recovery event.
+--- ended: auto-aggro opponents may remain. Preserve the ongoing round interval.
+--- The existing scan/progression recovery is not an after-combat guarantee.
 function Combat:onKill(expForKill)
     self.state = self.states.engaged
     self.pendingTarget = nil
@@ -228,13 +312,9 @@ end
 
 --- One-time transfer from the pre-extraction Leveling fields. Assignment is
 --- removed after copying so Combat remains the sole authoritative state owner.
-function Combat:migrateLegacyState()
-    if Leveling.initAction ~= nil then
-        self.initAction = normalizeAction(Leveling.initAction)
-        if self.initAction == "" then
-            self.initAction = "kill"
-        end
-    end
+function Combat:migrateLegacyState(engageAction)
+    self.engageCombatAction = normalizeAction(engageAction or self.engageCombatAction)
+    if self.engageCombatAction == "" then self.engageCombatAction = "kill" end
     if Leveling.ignoredMobNames ~= nil then
         self.ignoredMobNames = copyList(Leveling.ignoredMobNames)
     end
@@ -243,13 +323,17 @@ function Combat:migrateLegacyState()
     end
 
     Leveling.initAction = nil
+    self.initAction = nil
     Leveling.ignoredMobNames = nil
     Leveling.postKillActions = nil
 end
 
 function Combat:initialize()
-    self.version = 1
-    self.initAction = "kill"
+    self.version = 2
+    self.engageCombatAction = "kill"
+    self.duringCombatAction = ""
+    self.duringCombatActionRoundInterval = 1
+    self.combatRoundsSinceDuringCombatAction = 0
     self.ignoredMobNames = {}
     self.postKillActions = {}
     self.mobDefinitions = {}
@@ -258,16 +342,20 @@ function Combat:initialize()
     self:disableTriggers()
 end
 
-if Combat.version ~= 1 then
+if Combat.version ~= 1 and Combat.version ~= 2 then
     Combat:initialize()
 else
     -- Script reloads preserve configuration but not an uncertain engagement.
     Combat.state = Combat.states.idle
     Combat.pendingTarget = nil
+    Combat.combatRoundsSinceDuringCombatAction = 0
     Combat:disableTriggers()
 end
 
-Combat:migrateLegacyState()
+Combat.version = 2
+Combat.duringCombatAction = normalizeAction(Combat.duringCombatAction)
+Combat.duringCombatActionRoundInterval = normalizeRoundInterval(Combat.duringCombatActionRoundInterval) or 1
+Combat:migrateLegacyState(previousEngageAction)
 
 -- Preserve a running session during a package upgrade without making this the
 -- normal area-data dependency; Leveling.loadArea() configures future sessions.

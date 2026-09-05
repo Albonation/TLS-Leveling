@@ -1,4 +1,4 @@
-local valid_options = {"start", "haste", "fury", "detects", "sanc", "pka", "init", "ignore"}
+local valid_options = {"start", "engage", "duringcombat", "pka", "init", "ignore"}
 local valid_options_string = table.concat(valid_options, ", ")
 local option = matches[2]
 local value = matches[3]
@@ -16,22 +16,13 @@ end
 if option == "start" then
     Leveling.loadArea(value)
 
-elseif option == "haste" then
-    Leveling.setHaste(value)
-
-elseif option == "fury" then
-    Leveling.setFury(value)
-
-elseif option == "detects" then
-    Leveling.setDetects(value)
-
-elseif option == "sanc" then
-    Leveling.setSanc(value)
+elseif option == "duringcombat" then
+    Leveling.setDuringCombat(value)
 
 elseif option == "pka" then
     Leveling.addPostKillAction(value)
 
-elseif option == "init" then
+elseif option == "init" or option == "engage" then
     Leveling.setInit(value)
 
 elseif option == "ignore" then
